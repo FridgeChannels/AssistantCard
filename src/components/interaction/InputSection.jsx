@@ -29,8 +29,8 @@ export function InputSection({ onSearch, isCompact }) {
                     }}
                     placeholder="What are you worried about right now?"
                     className={cn(
-                        "w-full bg-transparent font-serif placeholder:text-gray-300 text-sothebys-navy border-none outline-none resize-none p-0 leading-tight transition-all duration-500",
-                        isCompact ? "text-lg min-h-[50px] py-2" : "text-xl md:text-2xl min-h-[60px] py-2" // Slightly smaller to fix nice at bottom
+                        "w-full bg-transparent font-sans placeholder:text-gray-400 placeholder:font-normal text-gray-800 border-none outline-none resize-none p-0 leading-tight transition-all duration-500",
+                        isCompact ? "text-[17px] min-h-[44px] py-1" : "text-[20px] min-h-[56px] py-2"
                     )}
                     rows={1}
                 />
@@ -38,7 +38,7 @@ export function InputSection({ onSearch, isCompact }) {
                     <button
                         onClick={handleSend}
                         disabled={!input.trim()}
-                        className="p-2.5 bg-sothebys-navy text-white rounded-full shadow-lg disabled:opacity-0 disabled:scale-75 transition-all duration-300 hover:scale-110 active:scale-95"
+                        className="p-3 bg-[#1D1D1F] text-white rounded-full shadow-lg disabled:opacity-0 disabled:scale-75 transition-all duration-300 hover:scale-105 active:scale-95"
                     >
                         <ArrowUp className="w-4 h-4" />
                     </button>

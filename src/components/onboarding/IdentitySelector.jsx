@@ -14,34 +14,37 @@ export function IdentitySelector({ onSelect }) {
 
             <div className="space-y-4">
                 {/* Buyer Option */}
+                {/* Buyer Option - Soft Cyan/Blue Gradient Hint */}
                 <motion.button
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onSelect('buyer')}
-                    className="w-full bg-white/60 backdrop-blur-[20px] border border-white/20 p-6 rounded-[24px] shadow-sm hover:shadow-lg transition-all group text-left flex items-center justify-between ring-1 ring-white/40"
+                    className="w-full relative overflow-hidden bg-white/70 backdrop-blur-[20px] p-6 rounded-[32px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-10px_rgba(0,122,255,0.1)] transition-all duration-500 group text-left flex items-center justify-between border border-white/40"
                 >
-                    <div>
-                        <div className="w-10 h-10 bg-sothebys-navy/5 rounded-full flex items-center justify-center mb-3 group-hover:bg-sothebys-navy group-hover:text-white transition-colors">
-                            <Key className="w-5 h-5 text-sothebys-navy group-hover:text-white transition-colors" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 to-blue-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-500">
+                            <Key className="w-6 h-6 text-cyan-600/80" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">I want to buy</h3>
-                        <p className="text-sm text-gray-500 mt-1">Find and secure your dream home</p>
+                        <h3 className="text-[22px] font-semibold text-gray-800 tracking-tight">I want to buy</h3>
+                        <p className="text-[15px] text-gray-500 mt-2 font-medium">Find and secure your dream home</p>
                     </div>
                 </motion.button>
 
-                {/* Seller Option */}
+                {/* Seller Option - Warm Orange Gradient Hint */}
                 <motion.button
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onSelect('seller')}
-                    className="w-full bg-white/60 backdrop-blur-[20px] border border-white/20 p-6 rounded-[24px] shadow-sm hover:shadow-lg transition-all group text-left flex items-center justify-between ring-1 ring-white/40"
+                    className="w-full relative overflow-hidden bg-white/70 backdrop-blur-[20px] p-6 rounded-[32px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-10px_rgba(255,149,0,0.1)] transition-all duration-500 group text-left flex items-center justify-between border border-white/40"
                 >
-                    <div>
-                        <div className="w-10 h-10 bg-sothebys-navy/5 rounded-full flex items-center justify-center mb-3 group-hover:bg-sothebys-navy group-hover:text-white transition-colors">
-                            <Home className="w-5 h-5 text-sothebys-navy group-hover:text-white transition-colors" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 to-amber-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-500">
+                            <Home className="w-6 h-6 text-orange-500/80" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">I want to sell</h3>
-                        <p className="text-sm text-gray-500 mt-1">Maximize value and list your property</p>
+                        <h3 className="text-[22px] font-semibold text-gray-800 tracking-tight">I want to sell</h3>
+                        <p className="text-[15px] text-gray-500 mt-2 font-medium">Maximize value and list your property</p>
                     </div>
                 </motion.button>
             </div>
