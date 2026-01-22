@@ -1,11 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
-export function InputSection({ onSearch, isCompact }) {
-    const [input, setInput] = useState("");
+export function InputSection({ onSearch, isCompact, initialValue = "" }) {
+    const [input, setInput] = useState(initialValue);
     const inputRef = useRef(null);
+
+    // Update input when initialValue changes
+    useEffect(() => {
+        // Always sync with initialValue, whether it's empty or has a value
+        setInput(initialValue || '');
+        // Focus input when value is set from outside (and not empty)
+        if (initialValue) {
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+        }
+    }, [initialValue]);
 
     const handleSend = () => {
         if (!input.trim()) return;
@@ -50,17 +62,21 @@ export function InputSection({ onSearch, isCompact }) {
                     inputRef.current?.focus();
                 }}
                 placeholder="What are you worried about?"
-                className="flex-1 bg-transparent border-none outline-none text-gray-400 text-base placeholder:text-gray-400 cursor-text"
+                className={cn(
+                    "flex-1 bg-transparent border-none outline-none text-base cursor-text transition-colors",
+                    input.trim() ? "text-gray-900" : "text-gray-400",
+                    "placeholder:text-gray-400"
+                )}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
             />
-            <button
+            {/* <button
                 onClick={handleMicClick}
                 className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors"
             >
                 <Mic className="w-5 h-5 text-black" />
-            </button>
+            </button> */}
             <button
                 onClick={handleSend}
                 disabled={!input.trim()}

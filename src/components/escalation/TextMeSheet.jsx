@@ -1,16 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Phone, MessageSquare } from 'lucide-react';
+import { X, Send, Mail, MessageSquare } from 'lucide-react';
+import { getDocumentSummary } from '../../lib/documentSummaryService';
 
-export function TextMeSheet({ isOpen, onClose, context }) {
+export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agentName = 'James', phone = '', email = '' }) {
     const [isSent, setIsSent] = useState(false);
+    const [documentSummary, setDocumentSummary] = useState({ email: '', message: '' });
+    const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
-    const handleSend = () => {
+    // 当对话框打开时，调用接口B获取文档总结
+    useEffect(() => {
+        if (isOpen && guideContent) {
+            setIsLoadingSummary(true);
+            getDocumentSummary(guideContent)
+                .then(summary => {
+                    setDocumentSummary(summary);
+                    setIsLoadingSummary(false);
+                })
+                .catch(error => {
+                    console.error('获取文档总结失败:', error);
+                    setIsLoadingSummary(false);
+                    // 失败时使用默认内容
+                    setDocumentSummary({ email: '', message: '' });
+                });
+        } else if (isOpen) {
+            // 如果没有guide内容，清空文档总结
+            setDocumentSummary({ email: '', message: '' });
+        }
+    }, [isOpen, guideContent]);
+
+    const handleSendSMS = () => {
+        if (phone) {
+            // 使用sms:协议发送短信，包含body参数
+            // 优先使用接口B返回的message，如果没有则使用context
+            const messageBody = documentSummary.message || context || '';
+            const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+            const body = encodeURIComponent(messageBody);
+            window.location.href = `sms:${formattedPhone}?body=${body}`;
+        }
         setIsSent(true);
         setTimeout(() => {
             setIsSent(false);
             onClose();
         }, 2000);
+    };
+
+    const handleSendEmail = () => {
+        if (email) {
+            // 使用mailto:协议发送邮件，包含subject和body参数
+            // 优先使用接口B返回的email内容，如果没有则使用context
+            const emailBody = documentSummary.email || context || 'Hi there';
+            const subject = encodeURIComponent('Contact');
+            const body = encodeURIComponent(emailBody);
+            window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+            // 邮件客户端打开后关闭对话框
+            onClose();
+        }
     };
 
     return (
@@ -35,7 +80,7 @@ export function TextMeSheet({ isOpen, onClose, context }) {
 
                         <div className="flex items-start justify-between mb-6">
                             <div>
-                                <h3 className="text-xl font-bold text-sothebys-navy mb-1">Contact Agent</h3>
+                                <h3 className="text-xl font-bold text-sothebys-navy mb-1">Contact {agentName}</h3>
                                 <p className="text-sm text-gray-500">Fastest way to get clarity on this.</p>
                             </div>
                             <button
@@ -69,19 +114,21 @@ export function TextMeSheet({ isOpen, onClose, context }) {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <button
-                                        onClick={handleSend}
-                                        className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10"
+                                        onClick={handleSendSMS}
+                                        disabled={!phone}
+                                        className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <MessageSquare className="w-6 h-6 mb-2" />
-                                        <span className="font-medium">Text Me</span>
+                                        <span className="font-medium">Text {agentName}</span>
                                     </button>
-                                    <a
-                                        href="tel:1234567890"
-                                        className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all"
+                                    <button
+                                        onClick={handleSendEmail}
+                                        disabled={!email}
+                                        className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <Phone className="w-6 h-6 mb-2" />
-                                        <span className="font-medium">Call Now</span>
-                                    </a>
+                                        <Mail className="w-6 h-6 mb-2" />
+                                        <span className="font-medium">Send Email</span>
+                                    </button>
                                 </div>
                             </div>
                         )}
