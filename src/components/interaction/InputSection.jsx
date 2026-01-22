@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Mic, ArrowUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
 export function InputSection({ onSearch, isCompact }) {
     const [input, setInput] = useState("");
+    const inputRef = useRef(null);
 
     const handleSend = () => {
         if (!input.trim()) return;
@@ -12,38 +13,61 @@ export function InputSection({ onSearch, isCompact }) {
         setInput("");
     };
 
+    const handleMicClick = () => {
+        // 处理麦克风点击
+        console.log('Mic clicked');
+    };
+
+    const handleContainerClick = (e) => {
+        // 如果点击的不是输入框或按钮，则聚焦输入框
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+            e.preventDefault();
+            inputRef.current?.focus();
+        }
+    };
+
+    const handleInputKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
     return (
         <motion.div
             layout
-            className="flex flex-col bg-white/60 backdrop-blur-[20px] border-t border-white/20 pt-2 pb-2"
+            onClick={handleContainerClick}
+            className="w-full max-w-[90%] mx-auto bg-gray-200/60 backdrop-blur-[30px] rounded-full flex items-center px-4 py-2 space-x-3 cursor-pointer"
         >
-            <div className="px-5 mb-2 relative group">
-                <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
-                        }
-                    }}
-                    placeholder="What are you worried about right now?"
-                    className={cn(
-                        "w-full bg-transparent font-sans placeholder:text-gray-400 placeholder:font-normal text-gray-800 border-none outline-none resize-none p-0 leading-tight transition-all duration-500",
-                        isCompact ? "text-[17px] min-h-[44px] py-1" : "text-[20px] min-h-[56px] py-2"
-                    )}
-                    rows={1}
-                />
-                <div className="absolute top-1/2 -translate-y-1/2 right-4">
-                    <button
-                        onClick={handleSend}
-                        disabled={!input.trim()}
-                        className="p-3 bg-[#1D1D1F] text-white rounded-full shadow-lg disabled:opacity-0 disabled:scale-75 transition-all duration-300 hover:scale-105 active:scale-95"
-                    >
-                        <ArrowUp className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
+            <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    inputRef.current?.focus();
+                }}
+                placeholder="What are you worried about?"
+                className="flex-1 bg-transparent border-none outline-none text-gray-400 text-base placeholder:text-gray-400 cursor-text"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+            />
+            <button
+                onClick={handleMicClick}
+                className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors"
+            >
+                <Mic className="w-5 h-5 text-black" />
+            </button>
+            <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <ArrowUp className="w-5 h-5 text-white" />
+            </button>
         </motion.div>
     );
 }

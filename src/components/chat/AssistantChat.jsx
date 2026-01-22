@@ -133,7 +133,7 @@ export function AssistantChat({ stage }) {
                     <button
                         type="disabled"
                         disabled={!input.trim()}
-                        className="w-10 h-10 rounded-full bg-sothebys-navy flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all shadow-md"
+                        className="w-10 h-10 rounded-[30px] bg-sothebys-navy/90 backdrop-blur-[20px] flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all shadow-md border border-white/10"
                     >
                         <Send className="w-4 h-4 ml-0.5" />
                     </button>

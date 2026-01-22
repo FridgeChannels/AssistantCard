@@ -13,11 +13,11 @@ export function StarterQuestions({ onSelect }) {
 
     return (
         <div className="w-full max-w-sm mx-auto px-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="relative flex items-center justify-center mb-4">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Where to start?</span>
                 <button
                     onClick={handleRefresh}
-                    className="p-2 text-gray-400 hover:text-sothebys-navy hover:bg-gray-50 rounded-full transition-colors"
+                    className="absolute right-0 p-2 text-gray-400 hover:text-sothebys-navy bg-white/60 backdrop-blur-[20px] hover:bg-white/80 rounded-[30px] transition-colors border border-white/40"
                 >
                     <RefreshCw className="w-4 h-4" />
                 </button>
@@ -31,11 +31,11 @@ export function StarterQuestions({ onSelect }) {
                             initial={{ opacity: 0, y: 20, scale: 0.9 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                            whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.95)" }}
+                            whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             transition={{ type: "spring", stiffness: 400, damping: 25 }}
                             onClick={() => onSelect(q)}
-                            className="w-full text-center px-6 py-4 bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)] text-sothebys-navy font-medium cursor-pointer ring-1 ring-black/5"
+                            className="w-full text-center px-6 py-2 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy font-medium cursor-pointer hover:bg-blue-300 transition-all"
                         >
                             {q}
                         </motion.button>

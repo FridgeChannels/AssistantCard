@@ -40,7 +40,7 @@ export function TextMeSheet({ isOpen, onClose, context }) {
                             </div>
                             <button
                                 onClick={onClose}
-                                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                                className="p-2 bg-white/60 backdrop-blur-[20px] border border-white/40 rounded-[30px] hover:bg-white/80 transition-colors"
                             >
                                 <X className="w-5 h-5 text-gray-500" />
                             </button>
@@ -70,14 +70,14 @@ export function TextMeSheet({ isOpen, onClose, context }) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <button
                                         onClick={handleSend}
-                                        className="flex flex-col items-center justify-center p-4 bg-sothebys-navy text-white rounded-xl shadow-lg hover:bg-sothebys-navy/90 hover:scale-[1.02] active:scale-95 transition-all"
+                                        className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10"
                                     >
                                         <MessageSquare className="w-6 h-6 mb-2" />
                                         <span className="font-medium">Text Me</span>
                                     </button>
                                     <a
                                         href="tel:1234567890"
-                                        className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 text-sothebys-navy rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                        className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all"
                                     >
                                         <Phone className="w-6 h-6 mb-2" />
                                         <span className="font-medium">Call Now</span>

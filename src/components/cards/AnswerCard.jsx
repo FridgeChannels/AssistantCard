@@ -28,8 +28,12 @@ export function AnswerCard({ answer, question, isFallback, onAction, onQuestionS
                 className="flex items-start gap-3"
             >
                 {/* Assistant Avatar - Smaller & Subtler */}
-                <div className="w-8 h-8 rounded-full bg-white shadow-sm ring-1 ring-gray-100 flex items-center justify-center flex-none mt-1">
-                    <img src="https://ui-avatars.com/api/?name=Assistant&background=002349&color=fff&size=64&font-size=0.4" alt="A" className="w-full h-full rounded-full opacity-90" />
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm ring-1 ring-gray-100 flex items-center justify-center flex-none mt-1">
+                    <img 
+                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face" 
+                        alt="Agent" 
+                        className="w-full h-full object-cover"
+                    />
                 </div>
 
                 {/* Answer Content */}
@@ -49,42 +53,18 @@ export function AnswerCard({ answer, question, isFallback, onAction, onQuestionS
                         <p className="text-[#1D1D1F] text-[17px] leading-relaxed tracking-normal font-normal">
                             {answer.text}
                         </p>
-
-                        {/* Structured Bits */}
-                        {!isFallback && (answer.meaning || answer.risk) && (
-                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                                {answer.meaning && (
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">What this means</span>
-                                        <p className="text-sm text-gray-700">{answer.meaning}</p>
-                                    </div>
-                                )}
-
-                                {answer.risk && (
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Watch For</span>
-                                        <p className="text-sm text-gray-800 bg-amber-50 p-2 rounded-lg border border-amber-100/50">
-                                            {answer.risk}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    {/* Action Button */}
-                    <motion.button
-                        onClick={onAction}
-                        className={cn(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all text-sm ml-1",
-                            isFallback
-                                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                                : "bg-white border border-gray-200 text-sothebys-navy shadow-sm hover:shadow-md hover:border-sothebys-navy/20"
-                        )}
-                    >
-                        {answer.actionLabel || (isFallback ? "Text [AgentName]" : "Text my agent with this")}
-                        {answer.actionLabel && !isFallback ? <ArrowRight className="w-4 h-4" /> : <MessageSquare className="w-4 h-4 opacity-50" />}
-                    </motion.button>
+                    {/* Action Button - Only show for fallback cases */}
+                    {isFallback && (
+                        <motion.button
+                            onClick={onAction}
+                            className="flex items-center justify-center gap-2 px-5 py-3 bg-green-400 text-white rounded-[30px] font-semibold text-sm shadow-[0_4px_12px_rgba(74,222,128,0.3)] hover:bg-green-500 transition-all"
+                        >
+                            {answer.actionLabel || "Text Agent"}
+                            <MessageSquare className="w-4 h-4" />
+                        </motion.button>
+                    )}
 
                 </div>
             </motion.div>
@@ -103,7 +83,7 @@ export function AnswerCard({ answer, question, isFallback, onAction, onQuestionS
                             <button
                                 key={i}
                                 onClick={() => onQuestionSelect(q)}
-                                className="text-left px-4 py-3 bg-white/50 border border-gray-100/50 rounded-xl text-sothebys-navy text-[15px] font-medium hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all active:scale-[0.99]"
+                                className="text-left px-4 py-1.5 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy text-sm font-medium hover:bg-blue-300 transition-all active:scale-[0.99]"
                             >
                                 {q}
                             </button>

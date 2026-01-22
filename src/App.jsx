@@ -1,27 +1,58 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MobileContainer } from './components/layout/MobileContainer';
-import { StickyCTA } from './components/layout/StickyCTA';
 import { InputSection } from './components/interaction/InputSection';
 import { AnswerCard } from './components/cards/AnswerCard';
+import { JamesInviteCard } from './components/cards/JamesInviteCard';
 import { TextMeSheet } from './components/escalation/TextMeSheet';
 import { IdentitySelector } from './components/onboarding/IdentitySelector';
 import { StarterQuestions } from './components/chat/StarterQuestions';
+import { MorningBriefing } from './components/briefing/MorningBriefing';
+import { MusicChat } from './components/chat/MusicChat';
+import { History } from './components/history/History';
 import { findAnswer } from './lib/mockData';
 import { Info, ArrowLeft } from 'lucide-react';
 
 function App() {
+  const [page, setPage] = useState('selector'); // 'selector' | 'briefing' | 'chat' | 'musicChat' | 'history'
   const [userRole, setUserRole] = useState(null); // 'buyer' | 'seller' | null
   const [chatHistory, setChatHistory] = useState([]); // Array of { question, answer }
   const [isTyping, setIsTyping] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [showJamesInvite, setShowJamesInvite] = useState(false);
 
   const messagesEndRef = useRef(null);
 
   // Reset state when role changes
   useEffect(() => {
     setChatHistory([]);
+    setShowJamesInvite(false);
   }, [userRole]);
+
+  const handleRoleSelect = (role) => {
+    setUserRole(role);
+    if (role === 'buyer') {
+      setPage('briefing');
+    } else {
+      setPage('chat');
+    }
+  };
+
+  const handleTalkToAssistant = () => {
+    setPage('chat');
+  };
+
+  const handleNavigateToHistory = () => {
+    setPage('history');
+  };
+
+  const handleBackFromHistory = () => {
+    setPage('chat');
+  };
+
+  const handleBackToBriefing = () => {
+    setPage('briefing');
+  };
 
   // Auto-scroll to bottom when chat history updates
   useEffect(() => {
@@ -35,7 +66,14 @@ function App() {
 
     setTimeout(() => {
       const result = findAnswer(query);
-      setChatHistory(prev => [...prev, { question: query, answer: result }]);
+      setChatHistory(prev => {
+        const newHistory = [...prev, { question: query, answer: result }];
+        // 每三轮对话后显示 James 邀请（第3、6、9、12...轮）
+        if (newHistory.length > 0 && newHistory.length % 3 === 0) {
+          setShowJamesInvite(true);
+        }
+        return newHistory;
+      });
       setIsTyping(false);
     }, 800);
   };
@@ -51,66 +89,92 @@ function App() {
   };
 
   return (
-    <MobileContainer className={userRole ? "pb-24" : ""}>
-      {/* Header - Apple Style Blur */}
-      <header className="px-5 py-3 flex items-center justify-between bg-white/80 backdrop-blur-xl border-b border-gray-100/50 sticky top-0 z-30 flex-none transition-all duration-300">
-        <div className="flex items-center gap-2">
-          {userRole && (
-            <button
-              onClick={() => setUserRole(null)}
-              className="mr-1 text-sothebys-navy/70 hover:text-sothebys-navy p-1 hover:bg-black/5 rounded-full transition-all"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-          <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">S</div>
-          <span className="font-semibold text-sothebys-navy tracking-tight">FCAssistant</span>
-        </div>
-        <button className="p-2 text-gray-400 hover:text-sothebys-navy hover:bg-black/5 rounded-full transition-colors active:scale-95">
-          <Info className="w-5 h-5" />
-        </button>
-      </header>
-
+    <MobileContainer>
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
-          {!userRole ? (
+          {page === 'selector' ? (
             <motion.div
               key="selector"
               initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} // Apple spring curve
-              className="flex-1 flex flex-col justify-center overflow-y-auto bg-gray-50/30"
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="flex-1 flex flex-col justify-center overflow-y-auto bg-gradient-to-b from-gray-50 to-gray-100"
             >
-              <IdentitySelector onSelect={setUserRole} />
+              <IdentitySelector onSelect={handleRoleSelect} />
+            </motion.div>
+          ) : page === 'briefing' ? (
+            <motion.div
+              key="briefing"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="flex-1 flex flex-col"
+            >
+              <MorningBriefing onTalkToAssistant={handleTalkToAssistant} />
+            </motion.div>
+          ) : page === 'musicChat' ? (
+            <motion.div
+              key="musicChat"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="flex-1 flex flex-col"
+            >
+              <MusicChat onNavigateToHistory={handleNavigateToHistory} />
+            </motion.div>
+          ) : page === 'history' ? (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="flex-1 flex flex-col"
+            >
+              <History onBack={handleBackFromHistory} />
             </motion.div>
           ) : (
             <motion.div
-              key="assistant"
+              key="chat"
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex-1 flex flex-col h-full relative"
-              style={{
-                backgroundColor: '#F2F2F4', // Light gray matte
-                backgroundImage: `
-                  radial-gradient(at 100% 0%, rgba(255,255,255,0.8) 0px, transparent 50%),
-                  radial-gradient(at 0% 0%, rgba(209,213,219,0.3) 0px, transparent 50%),
-                  url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E")
-                `
-              }}
+              className="flex-1 flex flex-col h-full relative bg-gradient-to-b from-gray-50 to-gray-100"
             >
+              {/* Header - Apple Style Blur */}
+              <header className="px-5 py-3 flex items-center justify-between bg-gradient-to-b from-gray-50 to-gray-100 backdrop-blur-xl sticky top-0 z-30 flex-none transition-all duration-300">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleBackToBriefing}
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/60 backdrop-blur-[20px] transition-colors"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-gray-900" />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">S</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight">FCAssistant</span>
+                  </div>
+                </div>
+              </header>
+
               {/* Scrollable Chat Area */}
               <div className="flex-1 overflow-y-auto px-0 py-6 space-y-2 no-scrollbar scroll-smooth">
                 {/* Empty State: Center Content */}
                 {chatHistory.length === 0 && (
                   <div className="h-full flex flex-col justify-center items-center pb-20">
                     {/* Welcome Icon */}
-                    <div className="mb-6 opacity-30">
-                      <div className="w-16 h-16 bg-sothebys-navy rounded-full flex items-center justify-center text-white text-3xl font-serif">
-                        S
+                    <div className="mb-6">
+                      <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-gray-200">
+                        <img 
+                          src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face&q=80" 
+                          alt="Agent" 
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     </div>
 
@@ -144,11 +208,24 @@ function App() {
                   </motion.div>
                 )}
 
+                {/* James Invite Card - Show every 3 rounds of conversation */}
+                {showJamesInvite && chatHistory.length > 0 && chatHistory.length % 3 === 0 && (
+                  <JamesInviteCard
+                    onTextJames={() => {
+                      setIsSheetOpen(true);
+                      setShowJamesInvite(false);
+                    }}
+                    onNotNow={() => {
+                      setShowJamesInvite(false);
+                    }}
+                  />
+                )}
+
                 <div ref={messagesEndRef} className="h-4" />
               </div>
 
               {/* Input Area (Pinned Bottom) */}
-              <div className="flex-none bg-white border-t border-gray-50 z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+              <div className="flex-none z-20 px-4 pb-4">
                 <InputSection
                   onSearch={handleSearch}
                   isCompact={chatHistory.length > 0}
@@ -158,8 +235,6 @@ function App() {
           )}
         </AnimatePresence>
       </div>
-
-      {userRole && <StickyCTA onTextAgent={handleTextAgent} />}
 
       <TextMeSheet
         isOpen={isSheetOpen}

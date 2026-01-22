@@ -19,7 +19,7 @@ export function IdentitySelector({ onSelect }) {
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onSelect('buyer')}
-                    className="w-full relative overflow-hidden bg-white/70 backdrop-blur-[20px] p-6 rounded-[32px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-10px_rgba(0,122,255,0.1)] transition-all duration-500 group text-left flex items-center justify-between border border-white/40"
+                    className="w-full relative overflow-hidden bg-white/70 backdrop-blur-[20px] p-6 rounded-[30px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-10px_rgba(0,122,255,0.1)] transition-all duration-500 group text-left flex items-center justify-between border border-white/40"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/50 to-blue-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="relative z-10">

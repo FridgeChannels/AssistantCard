@@ -11,7 +11,7 @@ const QUESTIONS = [
 
 export function QuickQuestions({ onSelect, stage }) {
     return (
-        <div className="w-full overflow-x-auto no-scrollbar py-4 pl-4 space-x-3 flex items-center bg-gray-50/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="w-full overflow-x-auto no-scrollbar py-4 pl-4 space-x-3 flex items-center bg-gray-200/80 backdrop-blur-sm sticky top-0 z-10">
             {QUESTIONS.map((q, i) => (
                 <motion.button
                     key={i}
@@ -19,7 +19,7 @@ export function QuickQuestions({ onSelect, stage }) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
                     onClick={() => onSelect(q)}
-                    className="flex-none bg-white border border-gray-200 rounded-full px-4 py-2 text-sm text-sothebys-navy shadow-sm hover:shadow-md hover:border-sothebys-navy/20 active:scale-95 transition-all whitespace-nowrap"
+                    className="flex-none bg-white/80 backdrop-blur-[20px] border border-white/40 rounded-[30px] px-4 py-2 text-sm text-sothebys-navy shadow-sm hover:shadow-md hover:border-sothebys-navy/20 active:scale-95 transition-all whitespace-nowrap"
                 >
                     {q}
                 </motion.button>

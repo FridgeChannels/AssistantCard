@@ -20,7 +20,7 @@ export function StageSelector({ currentStage, onStageChange }) {
     const activeStage = STAGES.find(s => s.id === currentStage) || STAGES[0];
 
     return (
-        <div className="relative z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 flex-none">
+        <div className="relative z-50 bg-gray-200/80 backdrop-blur-md border-b border-gray-200 flex-none">
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between px-6 py-4 outline-none active:bg-gray-50 transition-colors"
