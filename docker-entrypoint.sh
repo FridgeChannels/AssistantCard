@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+echo "Generating runtime environment configuration..."
+
+# 生成运行时配置文件
+cat > /app/dist/env-config.js << EOF
+window.ENV = {
+  VITE_SUPABASE_URL: "${VITE_SUPABASE_URL:-}",
+  VITE_SUPABASE_ANON_KEY: "${VITE_SUPABASE_ANON_KEY:-}",
+  VITE_CHAT_API_URL: "${VITE_CHAT_API_URL:-}",
+  VITE_CHAT_API_TOKEN: "${VITE_CHAT_API_TOKEN:-}",
+  VITE_RELATED_QUESTIONS_API_URL: "${VITE_RELATED_QUESTIONS_API_URL:-}",
+  VITE_RELATED_QUESTIONS_API_TOKEN: "${VITE_RELATED_QUESTIONS_API_TOKEN:-}",
+  VITE_DOCUMENT_SUMMARY_API_URL: "${VITE_DOCUMENT_SUMMARY_API_URL:-}",
+  VITE_DOCUMENT_SUMMARY_API_TOKEN: "${VITE_DOCUMENT_SUMMARY_API_TOKEN:-}"
+};
+EOF
+
+echo "Environment configuration generated successfully!"
+echo "Starting application..."
+
+# 执行传入的命令
+exec "$@"

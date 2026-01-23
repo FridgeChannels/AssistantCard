@@ -3,8 +3,10 @@
  * Handles interactions with the chat conversation API
  */
 
-const API_URL = import.meta.env.VITE_CHAT_API_URL;
-const API_TOKEN = import.meta.env.VITE_CHAT_API_TOKEN;
+import { env } from '../config/env.js';
+
+const API_URL = env.CHAT_API_URL;
+const API_TOKEN = env.CHAT_API_TOKEN;
 
 /**
  * Send a chat message and handle streaming response
@@ -47,7 +49,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
 
     // Check if response is JSON or streaming
     const contentType = response.headers.get('content-type') || '';
-    
+
     if (contentType.includes('application/json')) {
       // Non-streaming JSON response
       const data = await response.json();
@@ -68,7 +70,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
 
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) {
         // Try to parse any remaining buffer
         if (buffer.trim()) {
@@ -92,33 +94,33 @@ export async function sendChatMessage(query, cId, conversationId = '') {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
-      
+
       // Keep the last incomplete line in buffer
       buffer = lines.pop() || '';
 
       for (const line of lines) {
         if (line.trim() === '') continue;
-        
+
         // Handle SSE format data
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.substring(6));
-            
+
             // Extract answer text (could be partial or complete)
             if (data.answer) {
               fullAnswer = data.answer; // Replace with latest complete answer
             }
-            
+
             // Extract answer_method
             if (data.answer_method) {
               answerMethod = data.answer_method;
             }
-            
+
             // Extract conversation_id
             if (data.conversation_id) {
               newConversationId = data.conversation_id;
             }
-            
+
             // Handle error event
             if (data.event === 'error') {
               const errorMessage = data.message || 'An error occurred while processing your request.';
@@ -127,7 +129,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
               error.status = data.status;
               throw error;
             }
-            
+
             // Check for end event markers
             if (data.event === 'message_end') {
               break;
@@ -152,7 +154,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
             if (data.conversation_id) {
               newConversationId = data.conversation_id;
             }
-            
+
             // Handle error event (direct JSON format)
             if (data.event === 'error') {
               const errorMessage = data.message || 'An error occurred while processing your request.';
@@ -237,7 +239,7 @@ export async function sendChatMessageStream(
 
     // Check if response is JSON or streaming
     const contentType = response.headers.get('content-type') || '';
-    
+
     if (contentType.includes('application/json')) {
       // Non-streaming JSON response (shouldn't happen, but handle it)
       const data = await response.json();
@@ -257,7 +259,7 @@ export async function sendChatMessageStream(
 
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) {
         // Process any remaining buffer as plain text
         if (buffer.trim()) {
@@ -269,20 +271,20 @@ export async function sendChatMessageStream(
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
-      
+
       // Keep the last incomplete line in buffer
       buffer = lines.pop() || '';
 
       for (const line of lines) {
         if (line.trim() === '') continue;
-        
+
         // Handle SSE format: data: <JSON>
         if (line.startsWith('data: ')) {
           const content = line.substring(6); // Remove 'data: ' prefix
-          
+
           try {
             const data = JSON.parse(content);
-            
+
             // Handle error event
             if (data.event === 'error') {
               const errorMessage = data.message || 'An error occurred while processing your request.';
@@ -292,7 +294,7 @@ export async function sendChatMessageStream(
               onError?.(error);
               return; // Exit early on error
             }
-            
+
             // Extract answer text from message events
             if (data.event === 'message' && data.answer) {
               // Append answer chunk to full answer
@@ -300,17 +302,17 @@ export async function sendChatMessageStream(
               // Send chunk to onChunk callback for real-time updates
               onChunk?.(data.answer);
             }
-            
+
             // Extract answer_method from JSON if present
             if (data.answer_method) {
               extractedAnswerMethod = data.answer_method;
             }
-            
+
             // Extract conversation_id from JSON if present
             if (data.conversation_id) {
               newConversationId = data.conversation_id;
             }
-            
+
             // Check for end event markers
             if (data.event === 'message_end' || data.event === 'workflow_finished') {
               break;
@@ -325,7 +327,7 @@ export async function sendChatMessageStream(
           // Direct JSON format (likely error event)
           try {
             const data = JSON.parse(line.trim());
-            
+
             // Handle error event
             if (data.event === 'error') {
               const errorMessage = data.message || 'An error occurred while processing your request.';
@@ -335,18 +337,18 @@ export async function sendChatMessageStream(
               onError?.(error);
               return; // Exit early on error
             }
-            
+
             // Extract answer from direct JSON
             if (data.answer) {
               fullAnswer += data.answer;
               onChunk?.(data.answer);
             }
-            
+
             // Extract answer_method from JSON if present
             if (data.answer_method) {
               extractedAnswerMethod = data.answer_method;
             }
-            
+
             // Extract conversation_id if present
             if (data.conversation_id) {
               newConversationId = data.conversation_id;

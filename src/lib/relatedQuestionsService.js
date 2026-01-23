@@ -3,8 +3,10 @@
  * 获取推荐问题列表
  */
 
-const API_URL = import.meta.env.VITE_RELATED_QUESTIONS_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
-const API_TOKEN = import.meta.env.VITE_RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0cU';
+import { env } from '../config/env.js';
+
+const API_URL = env.RELATED_QUESTIONS_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
+const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0cU';
 
 /**
  * 获取推荐问题列表
@@ -49,7 +51,7 @@ export async function getRelatedQuestions(cId, conversationId = '') {
 
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) {
         if (buffer.trim()) {
           fullAnswer += buffer.trim();
@@ -63,18 +65,18 @@ export async function getRelatedQuestions(cId, conversationId = '') {
 
       for (const line of lines) {
         if (line.trim() === '') continue;
-        
+
         if (line.startsWith('data: ')) {
           const content = line.substring(6);
-          
+
           try {
             const data = JSON.parse(content);
-            
+
             if (data.event === 'error') {
               console.error('推荐问题API错误:', data.message);
               return [];
             }
-            
+
             if (data.event === 'message' && data.answer) {
               fullAnswer += data.answer;
             }
@@ -93,12 +95,12 @@ export async function getRelatedQuestions(cId, conversationId = '') {
 
     try {
       const parsed = JSON.parse(fullAnswer);
-      
+
       // 检查是否有 recom.recom 数组
       if (parsed.recom && parsed.recom.recom && Array.isArray(parsed.recom.recom)) {
         return parsed.recom.recom;
       }
-      
+
       // 兼容其他可能的格式
       if (Array.isArray(parsed)) {
         return parsed;
@@ -109,7 +111,7 @@ export async function getRelatedQuestions(cId, conversationId = '') {
       if (parsed.recom && Array.isArray(parsed.recom)) {
         return parsed.recom;
       }
-      
+
       console.warn('推荐问题API返回格式不符合预期:', parsed);
       return [];
     } catch (e) {
@@ -119,7 +121,7 @@ export async function getRelatedQuestions(cId, conversationId = '') {
         .split('\n')
         .map(q => q.trim())
         .filter(q => q.length > 0);
-      
+
       return questions.length > 0 ? questions : [];
     }
 

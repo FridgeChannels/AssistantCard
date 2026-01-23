@@ -1,0 +1,33 @@
+# Docker Compose 配置示例
+
+version: '3.8'
+
+services:
+  assistantcard:
+    image: assistantcard:v1.0.2
+    container_name: assistantcard
+    restart: always
+    ports:
+      - "4173:4173"
+    environment:
+      # Supabase 配置
+      VITE_SUPABASE_URL: "https://vggkiumpajbvaxiflrtu.supabase.co"
+      VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnZ2tpdW1wYWpidmF4aWZscnR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NDU3NjcsImV4cCI6MjA4NDUyMTc2N30.RTx7xJmgqdmh_UxwPLlmO6o2I-dV6u-JHzh8IwnR-Bc"
+      
+      # Chat API 配置
+      VITE_CHAT_API_URL: "https://kno.fridgechannels.com/v1/chat-messages"
+      VITE_CHAT_API_TOKEN: "app-ud8rXy1MeIY87Bv0Q79hLeFT"
+      
+      # Related Questions API 配置
+      VITE_RELATED_QUESTIONS_API_URL: "https://kno.fridgechannels.com/v1/chat-messages"
+      VITE_RELATED_QUESTIONS_API_TOKEN: "app-djjUthOrEQK0XoXWpK0NM0cU"
+      
+      # Document Summary API 配置
+      VITE_DOCUMENT_SUMMARY_API_URL: "https://kno.fridgechannels.com/v1/chat-messages"
+      VITE_DOCUMENT_SUMMARY_API_TOKEN: "app-4dXrzm4ppdxc0mv87NCyLEoj"
+    networks:
+      - net-dev
+
+networks:
+  net-dev:
+    external: true

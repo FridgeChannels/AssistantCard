@@ -3,8 +3,10 @@
  * 获取文档总结内容，用于发送Email或短信
  */
 
-const API_URL = import.meta.env.VITE_DOCUMENT_SUMMARY_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
-const API_TOKEN = import.meta.env.VITE_DOCUMENT_SUMMARY_API_TOKEN || 'app-4dXrzm4ppdxc0mv87NCyLEoj';
+import { env } from '../config/env.js';
+
+const API_URL = env.DOCUMENT_SUMMARY_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
+const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN || 'app-4dXrzm4ppdxc0mv87NCyLEoj';
 
 /**
  * 获取文档总结内容
@@ -66,7 +68,7 @@ export async function getDocumentSummary(query, agentName, cId) {
 
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) {
         if (buffer.trim()) {
           fullAnswer += buffer.trim();
@@ -80,13 +82,13 @@ export async function getDocumentSummary(query, agentName, cId) {
 
       for (const line of lines) {
         if (line.trim() === '') continue;
-        
+
         if (line.startsWith('data: ')) {
           const content = line.substring(6);
-          
+
           try {
             const data = JSON.parse(content);
-            
+
             if (data.event === 'error') {
               console.error('文档总结API错误:', data.message);
               return {
@@ -94,7 +96,7 @@ export async function getDocumentSummary(query, agentName, cId) {
                 message: ''
               };
             }
-            
+
             if (data.event === 'message' && data.answer) {
               fullAnswer += data.answer;
             }
@@ -115,7 +117,7 @@ export async function getDocumentSummary(query, agentName, cId) {
 
     try {
       const parsed = JSON.parse(fullAnswer);
-      
+
       // 检查返回格式是否符合预期
       if (parsed.email && parsed.message) {
         return {
@@ -123,7 +125,7 @@ export async function getDocumentSummary(query, agentName, cId) {
           message: parsed.message || ''
         };
       }
-      
+
       // 如果格式不符合，返回原始内容
       return {
         email: fullAnswer,

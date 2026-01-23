@@ -25,19 +25,34 @@ WORKDIR /app
 # 全局安装 pm2
 RUN npm install -g pm2
 
+# 复制 package.json 文件
+COPY package*.json ./
+
+# 只安装生产依赖和 vite（preview 需要）
+RUN npm ci --omit=dev && \
+    npm install vite && \
+    npm cache clean --force
+
 # 从构建阶段复制构建产物
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/vite.config.js ./
 
-# 安装依赖（包括 vite，因为 vite preview 需要它）
-RUN npm ci && npm cache clean --force
-
-# 复制 pm2 配置文件
+# 复制配置文件
+COPY vite.config.js ./
 COPY ecosystem.config.cjs ./
+
+# 复制 entrypoint 脚本
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # 暴露端口（vite preview 默认使用 4173）
 EXPOSE 4173
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4173/ || exit 1
+
+# 设置 entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # 使用 pm2 启动应用
 CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]
