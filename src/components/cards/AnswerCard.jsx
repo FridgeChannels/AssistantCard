@@ -65,7 +65,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                     </div>
 
                     {/* Text James Button - Show if answerMethod indicates guide/direct and answer is complete */}
-                    {answer.type !== 'loading' && answer.answerMethod && (answer.answerMethod === 'guide' || answer.answerMethod === 'guide/direct' || answer.answerMethod === 'direct') && (
+                    {answer.type !== 'loading' && answer.answerMethod && (answer.answerMethod === 'guide') && (
                         <motion.div
                             initial={{ opacity: 0, y: 8, scale: 0.96 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -78,7 +78,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                             className="mt-3 pl-1"
                         >
                             <div className={`flex gap-3 ${answer.answerMethod === 'direct' ? 'justify-start' : ''}`}>
-                                {onNotNow && (
+                                {/* {onNotNow && (
                                     <motion.button
                                         onClick={onNotNow}
                                         initial={{ opacity: 0, x: -8 }}
@@ -95,7 +95,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                                     >
                                         Not now
                                     </motion.button>
-                                )}
+                                )} */}
                                 {onTextJames && (
                                     <motion.button
                                         onClick={onTextJames}

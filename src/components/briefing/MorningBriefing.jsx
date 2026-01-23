@@ -3,16 +3,18 @@ import { motion } from 'framer-motion';
 import { Mic, Play, Pause, AlertCircle } from 'lucide-react';
 import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
+import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 
-export function MorningBriefing({ 
-    onTalkToAssistant, 
-    cId = '', 
-    hasPreloaded = false, 
+export function MorningBriefing({
+    onTalkToAssistant,
+    cId = '',
+    hasPreloaded = false,
     onQuestionsPreloaded,
     cachedPlayContent = null,
     isLoadingPlayContent = false,
     onPlayContentLoaded,
-    onPlayContentLoadingChange
+    onPlayContentLoadingChange,
+    onSavePlaybackState
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [playContent, setPlayContent] = useState(cachedPlayContent); // 使用缓存的播放内容
@@ -21,6 +23,9 @@ export function MorningBriefing({
     const [audioElement, setAudioElement] = useState(null);
     const hasPreloadedQuestions = useRef(false); // 防止重复调用接口A
     const hasLoadedPlayContent = useRef(false); // 防止重复加载播放内容
+    const currentPlayLogId = useRef(null); // 当前播放日志ID
+    const playStartTime = useRef(null); // 播放开始时间
+    const audioRef = useRef(null); // 用于cleanup中访问audioElement
 
     const currentDate = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -36,7 +41,7 @@ export function MorningBriefing({
         if (hasPreloadedQuestions.current || hasPreloaded || !cId) {
             return;
         }
-        
+
         // 立即调用接口A获取推荐问题（懒加载）
         hasPreloadedQuestions.current = true; // 标记已调用
         getRelatedQuestions(cId, '').then(questions => {
@@ -55,7 +60,7 @@ export function MorningBriefing({
             setPlayContent(cachedPlayContent);
             setIsLoading(false);
             hasLoadedPlayContent.current = true; // 标记已加载，避免重复请求
-            
+
             // 创建音频元素（如果还没有）
             if (cachedPlayContent.audio_url) {
                 // 使用函数式更新来避免依赖 audioElement
@@ -64,18 +69,70 @@ export function MorningBriefing({
                         return prev; // 如果已经存在，不重复创建
                     }
                     const audio = new Audio(cachedPlayContent.audio_url);
-                    audio.addEventListener('ended', () => {
+
+                    // 恢复播放进度
+                    if (cachedPlayContent.savedCurrentTime) {
+                        audio.currentTime = cachedPlayContent.savedCurrentTime;
+                    }
+
+                    audio.addEventListener('ended', async () => {
                         setIsPlaying(false);
+
+                        // 音频播放结束，更新播放日志
+                        if (currentPlayLogId.current && playStartTime.current) {
+                            const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
+                            const totalDuration = audio.duration ? Math.floor(audio.duration) : null;
+
+                            await updatePlayContentLog(currentPlayLogId.current, {
+                                duration: duration,
+                                totalDuration: totalDuration,
+                            });
+
+                            // 重置
+                            currentPlayLogId.current = null;
+                            playStartTime.current = null;
+                        }
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
+
+                    audioRef.current = audio; // 更新ref
                     return audio;
                 });
             }
         }
     }, [cachedPlayContent]); // 只依赖 cachedPlayContent
+
+    // 组件卸载时的清理
+    useEffect(() => {
+        return () => {
+            if (audioRef.current) {
+                const audio = audioRef.current;
+
+                // 如果正在播放，记录日志
+                if (!audio.paused && currentPlayLogId.current && playStartTime.current) {
+                    const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
+                    const totalDuration = audio.duration ? Math.floor(audio.duration) : null;
+
+                    // 异步更新日志
+                    updatePlayContentLog(currentPlayLogId.current, {
+                        duration: duration,
+                        totalDuration: totalDuration,
+                    }).catch(console.error);
+                }
+
+                // 暂停播放
+                audio.pause();
+
+                // 保存进度到父组件
+                if (onSavePlaybackState) {
+                    onSavePlaybackState(audio.currentTime);
+                }
+            }
+        };
+    }, [onSavePlaybackState]);
 
     // Load play content - 只在首次加载时请求，或重新加载页面时请求
     useEffect(() => {
@@ -89,9 +146,9 @@ export function MorningBriefing({
             if (hasLoadedPlayContent.current || isLoadingPlayContent || cachedPlayContent) {
                 return;
             }
-            
+
             hasLoadedPlayContent.current = true;
-            
+
             try {
                 setIsLoading(true);
                 setError(null);
@@ -112,7 +169,7 @@ export function MorningBriefing({
                 }
 
                 setPlayContent(content);
-                
+
                 // 通知父组件缓存内容
                 if (onPlayContentLoaded) {
                     onPlayContentLoaded(content);
@@ -129,6 +186,7 @@ export function MorningBriefing({
                         setError('Audio is not ready yet');
                     });
                     setAudioElement(audio);
+                    audioRef.current = audio; // 更新ref
                 }
 
             } catch (err) {
@@ -147,30 +205,46 @@ export function MorningBriefing({
 
         // Cleanup audio element
         return () => {
-            if (audioElement) {
-                audioElement.pause();
-                audioElement.src = '';
-            }
-            // 注意：不重置 hasLoadedPlayContent.current，因为已经加载过的内容应该保留
-            // 重置逻辑由 App.jsx 中的 playContentCacheRef 统一管理
+            // Cleanup logic moved to dedicated effect
         };
     }, []); // 只在组件首次挂载时执行，不依赖任何变量
 
-    const handlePlay = () => {
+    const handlePlay = async () => {
         if (!audioElement) {
             console.warn('No audio available');
             return;
         }
 
         if (isPlaying) {
+            // 暂停播放
             audioElement.pause();
             setIsPlaying(false);
+
+            // 更新播放日志
+            if (currentPlayLogId.current && playStartTime.current) {
+                const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
+                const totalDuration = audioElement.duration ? Math.floor(audioElement.duration) : null;
+
+                await updatePlayContentLog(currentPlayLogId.current, {
+                    duration: duration,
+                    totalDuration: totalDuration,
+                });
+            }
         } else {
+            // 开始播放
             audioElement.play().catch(err => {
                 console.error('Playback issue:', err);
                 setError('Unable to play at this time');
             });
             setIsPlaying(true);
+
+            // 创建播放日志
+            playStartTime.current = Date.now();
+            const logId = await createPlayContentLog({
+                cId: cId,
+                playContentId: playContent?.id,
+            });
+            currentPlayLogId.current = logId;
         }
     };
 
@@ -231,7 +305,7 @@ export function MorningBriefing({
                                 {displayTitle}
                             </h2>
 
-                            
+
                         </div>
 
                         {/* Audio Player */}

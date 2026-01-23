@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
+import { logUserAction } from '../../lib/loggingService';
 
-export function StarterQuestions({ 
-    onSelect, 
-    cId = '', 
+export function StarterQuestions({
+    onSelect,
+    cId = '',
     conversationId = '',
     preloadedQuestions = [],
     isLoadingPreloaded = false,
@@ -29,7 +30,7 @@ export function StarterQuestions({
                 if (onLoadingChange) onLoadingChange(false);
                 return;
             }
-            
+
             // 如果有预加载的问题，直接使用
             if (preloadedQuestions && preloadedQuestions.length > 0) {
                 setQuestions(preloadedQuestions);
@@ -38,7 +39,7 @@ export function StarterQuestions({
                 hasFetched.current = true;
                 return;
             }
-            
+
             // 如果没有预加载的问题，才发起请求
             setIsLoading(true);
             if (onLoadingChange) onLoadingChange(true);
@@ -66,7 +67,7 @@ export function StarterQuestions({
         fetchQuestions();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cId, conversationId]);
-    
+
     // 当预加载的问题更新时，更新本地状态
     useEffect(() => {
         if (preloadedQuestions && preloadedQuestions.length > 0 && questions.length === 0 && !hasFetched.current) {
@@ -75,7 +76,7 @@ export function StarterQuestions({
             hasFetched.current = true;
         }
     }, [preloadedQuestions, questions.length]);
-    
+
     // 当 cId 或 conversationId 变化时，重置标志
     useEffect(() => {
         hasFetched.current = false;
@@ -86,7 +87,7 @@ export function StarterQuestions({
         if (!cId) {
             return;
         }
-        
+
         setIsLoading(true);
         getRelatedQuestions(cId, conversationId)
             .then(relatedQuestions => {
@@ -135,7 +136,19 @@ export function StarterQuestions({
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                onClick={() => onSelect(q)}
+                                onClick={() => {
+                                    // 记录点击推荐问题日志
+                                    logUserAction({
+                                        cId: cId,
+                                        actionType: 'click_question',
+                                        questionText: q,
+                                        context: {
+                                            source: 'starter_questions',
+                                            questionIndex: i,
+                                        },
+                                    });
+                                    onSelect(q);
+                                }}
                                 className="w-full text-center px-6 py-2 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy font-medium cursor-pointer hover:bg-blue-300 transition-all"
                             >
                                 {q}
