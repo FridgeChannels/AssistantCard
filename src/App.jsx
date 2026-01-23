@@ -45,20 +45,27 @@ function App({ cId = '' }) {
   const [conversationId, setConversationId] = useState(''); // 用于保持对话上下文
   const [currentAnswer, setCurrentAnswer] = useState(''); // 用于流式更新当前答案
   const [retryQuestion, setRetryQuestion] = useState(''); // 用于存储需要重试的问题
-  const [hasExtractedMethod, setHasExtractedMethod] = useState(false); // 标记是否已提取过 [method]
   const [agentInfo, setAgentInfo] = useState({ phone: '', email: '', name: 'James' }); // 代理联系信息
   const [starterQuestions, setStarterQuestions] = useState([]); // 存储预加载的推荐问题
   const [isLoadingStarterQuestions, setIsLoadingStarterQuestions] = useState(false); // 推荐问题加载状态
+  const hasPreloadedQuestionsRef = useRef(false); // 标记是否已经懒加载过推荐问题
+  const playContentCacheRef = useRef(null); // 缓存播放内容，避免重复请求
+  const isLoadingPlayContentRef = useRef(false); // 标记是否正在加载播放内容，防止并发请求
 
   const messagesEndRef = useRef(null);
+  const answerStartRef = useRef(null); // 用于定位答案开始位置
+  const prevChatHistoryLengthRef = useRef(0); // 记录上一次的 chatHistory 长度
 
   // Reset state when role changes or cId changes
   useEffect(() => {
     setChatHistory([]);
     setConversationId('');
     setCurrentAnswer('');
-    setHasExtractedMethod(false);
     setStarterQuestions([]); // 重置推荐问题
+    hasPreloadedQuestionsRef.current = false; // 重置懒加载标记
+    playContentCacheRef.current = null; // 重置播放内容缓存（cId变化时需要重新加载）
+    isLoadingPlayContentRef.current = false; // 重置加载状态
+    prevChatHistoryLengthRef.current = 0; // 重置历史长度记录
   }, [userRole, cId]);
 
   // 获取代理信息
@@ -102,12 +109,26 @@ function App({ cId = '' }) {
     setPage('briefing');
   };
 
-  // Auto-scroll to bottom when chat history updates
+  // 只在添加新消息时滚动到答案开始位置，流式更新和答案完成时不自动滚动
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const currentLength = chatHistory.length;
+    const prevLength = prevChatHistoryLengthRef.current;
+    
+    // 只在添加新消息时（长度增加）滚动到答案开始位置
+    if (currentLength > prevLength) {
+      // 使用 requestAnimationFrame 确保 DOM 已更新
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (answerStartRef.current) {
+            answerStartRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
     }
-  }, [chatHistory, isTyping]);
+    
+    // 更新记录的长度
+    prevChatHistoryLengthRef.current = currentLength;
+  }, [chatHistory.length]); // 只依赖长度，不依赖整个 chatHistory
 
   const handleSearch = (query) => {
     if (!cId) {
@@ -124,7 +145,6 @@ function App({ cId = '' }) {
     setChatHistory(prev => [...prev, { question: query, answer: tempAnswer }]);
     setIsTyping(true);
     setCurrentAnswer('');
-    setHasExtractedMethod(false); // Reset method extraction flag for new question
 
     // 立即开始获取推荐问题（接口A）- 在回答渲染时就开始请求
     getRelatedQuestions(cId, conversationId).then(questions => {
@@ -157,98 +177,82 @@ function App({ cId = '' }) {
       conversationId,
       // onChunk: 接收到数据块时更新当前答案（纯文本格式）
       (chunk) => {
-        // API returns plain text, not JSON
-        const answerText = chunk;
-
         setCurrentAnswer(prev => {
           // Append chunk to previous answer (streaming)
-          let newAnswer = prev + answerText;
+          let accumulatedAnswer = prev + chunk;
           
-          // Parse answer_method from [method] prefix (check continuously until found)
-          // This ensures [method] is removed as soon as it's detected, not at the end
-          let extractedAnswerMethod = null;
-          if (!hasExtractedMethod) {
-            // Continuously check for [method] prefix in the accumulated text
-            // This handles cases where [method] might be split across chunks
-            const parsed = parseAnswerWithMethod(newAnswer);
-            if (parsed.answerMethod) {
-              newAnswer = parsed.text;
-              extractedAnswerMethod = parsed.answerMethod;
-              setHasExtractedMethod(true); // Mark that we've extracted the method
-            }
-          } else {
-            // If we've already extracted the method, make sure [method] is not in the text
-            // This handles edge cases where [method] might appear again
-            const parsed = parseAnswerWithMethod(newAnswer);
-            if (parsed.answerMethod) {
-              newAnswer = parsed.text;
-            }
-          }
-          
-          // Check if this looks like an error message (only check for explicit error messages, not empty strings during streaming)
-          // Don't set retryQuestion here - wait for onComplete to make final determination
-          const isErrorText = newAnswer === "I'm sorry, I didn't receive a valid response. Please try again.";
-          
-          // 实时更新最后一条消息的答案（保留现有字段）
-          // 注意：在流式输出过程中不设置 answerMethod，只在 onComplete 中设置，确保按钮在内容完全渲染后才显示
+          // 检查最后一条消息是否已经有 answerMethod，如果没有则尝试解析
           setChatHistory(prevHistory => {
             const newHistory = [...prevHistory];
             if (newHistory.length > 0) {
               const currentAnswer = newHistory[newHistory.length - 1].answer || {};
+              const existingAnswerMethod = currentAnswer.answerMethod;
+              
+              // 如果还没有提取过 answerMethod，尝试从累积的文本中解析
+              let cleanedAnswer = accumulatedAnswer;
+              let answerMethod = existingAnswerMethod;
+              
+              if (!existingAnswerMethod) {
+                const parsed = parseAnswerWithMethod(accumulatedAnswer);
+                if (parsed.answerMethod) {
+                  cleanedAnswer = parsed.text;
+                  answerMethod = parsed.answerMethod;
+                }
+              } else {
+                // 如果已经提取过，确保 [method] 不会出现在文本中
+                const parsed = parseAnswerWithMethod(accumulatedAnswer);
+                if (parsed.answerMethod) {
+                  cleanedAnswer = parsed.text;
+                }
+              }
+              
+              // Check if this looks like an error message
+              const isErrorText = cleanedAnswer === "I'm sorry, I didn't receive a valid response. Please try again.";
               
               newHistory[newHistory.length - 1] = {
                 ...newHistory[newHistory.length - 1],
                 answer: {
                   ...currentAnswer,
-                  text: newAnswer,
+                  text: cleanedAnswer,
                   type: isErrorText ? 'error' : (currentAnswer.type || 'result'),
-                  // Don't set answerMethod during streaming - wait for onComplete
-                  // This ensures buttons only appear after content is fully rendered
-                  answerMethod: undefined, // Keep undefined during streaming
-                  // Clear relatedQuestions only if explicit error message detected
+                  answerMethod: answerMethod || undefined, // 如果有则设置，否则保持 undefined
                   relatedQuestions: isErrorText ? [] : (currentAnswer.relatedQuestions || []),
                 }
               };
-              
             }
             return newHistory;
           });
-          return newAnswer;
+          
+          return accumulatedAnswer;
         });
       },
       // onComplete: 完成时保存最终答案和 conversation_id
-      (finalAnswer, newConversationId, answerMethod) => {
-        // API returns plain text, not JSON
-        let answerText = finalAnswer;
-
-        // Parse answer_method from [method] prefix in the answer text (if not already extracted)
-        const parsed = parseAnswerWithMethod(answerText);
-        answerText = parsed.text;
-        // Use extracted answerMethod if not already set
-        if (!answerMethod) {
-          answerMethod = parsed.answerMethod;
-        }
-
-        // Debug: Log answerMethod to check if it's being received
-        console.log('onComplete - answerMethod:', answerMethod, 'parsed:', parsed.answerMethod, 'answerText:', answerText?.substring(0, 50));
-
+      (finalAnswer, newConversationId, answerMethodFromAPI) => {
         setConversationId(newConversationId);
-        setCurrentAnswer(answerText);
         setIsTyping(false);
         
-        // Check if this is an error response (empty answer or error message)
-        const isErrorResponse = !answerText || 
-          answerText === "I'm sorry, I didn't receive a valid response. Please try again." ||
-          answerText.trim() === '';
-        
-        // 更新最后一条消息的最终答案
+        // 从 chatHistory 中获取已有的 answerMethod（可能在流式过程中已经提取）
         setChatHistory(prev => {
           const newHistory = [...prev];
           if (newHistory.length > 0) {
-            const failedQuestion = newHistory[newHistory.length - 1].question;
+            const currentAnswer = newHistory[newHistory.length - 1].answer || {};
+            const existingAnswerMethod = currentAnswer.answerMethod;
             
-            // If error response, copy question to input and don't show related questions
+            // 解析最终答案，移除 [method] 前缀
+            const parsed = parseAnswerWithMethod(finalAnswer);
+            let answerText = parsed.text;
+            
+            // 确定最终的 answerMethod：优先级 API > 已有 > 解析
+            const finalAnswerMethod = answerMethodFromAPI || existingAnswerMethod || parsed.answerMethod;
+            const normalizedAnswerMethod = finalAnswerMethod ? finalAnswerMethod.toString().toLowerCase().trim() : null;
+            
+            // Check if this is an error response
+            const isErrorResponse = (!normalizedAnswerMethod && (!answerText || 
+              answerText === "I'm sorry, I didn't receive a valid response. Please try again." ||
+              answerText.trim() === ''));
+            
             if (isErrorResponse) {
+              const failedQuestion = newHistory[newHistory.length - 1].question;
               if (failedQuestion) {
                 setRetryQuestion(failedQuestion);
               }
@@ -257,41 +261,28 @@ function App({ cId = '' }) {
                 answer: {
                   text: answerText || "I'm sorry, I didn't receive a valid response. Please try again.",
                   type: 'error',
-                  relatedQuestions: [], // 错误时不显示推荐问题
+                  relatedQuestions: [],
                 }
               };
             } else {
-              // Normal response - clear retry question to ensure input is empty
               setRetryQuestion('');
-              
-              // Determine if should show James Invite Card based on answer_method
-              // Show James Invite Card for "guide", "guide/direct", or "direct"
-              // Normalize answerMethod: handle both "guide/direct" and "direct" cases
-              const normalizedAnswerMethod = (answerMethod || newHistory[newHistory.length - 1].answer?.answerMethod || '').toString().toLowerCase().trim();
-              const shouldShowJamesInvite = normalizedAnswerMethod === 'guide' || 
-                                            normalizedAnswerMethod === 'guide/direct' || 
-                                            normalizedAnswerMethod === 'direct';
-              
-              console.log('Checking James Invite Card - answerMethod:', normalizedAnswerMethod, 'original:', answerMethod, 'shouldShow:', shouldShowJamesInvite);
-              
-              // 获取当前已有的推荐问题（可能在流式渲染时已经获取到了）
-              const existingRelatedQuestions = newHistory[newHistory.length - 1].answer?.relatedQuestions || [];
+              const existingRelatedQuestions = currentAnswer.relatedQuestions || [];
               
               newHistory[newHistory.length - 1] = {
                 ...newHistory[newHistory.length - 1],
                 answer: {
-                  text: answerText,
+                  text: answerText || '',
                   type: 'result',
-                  answerMethod: normalizedAnswerMethod, // Store answerMethod for James Invite Card display
-                  relatedQuestions: existingRelatedQuestions, // 使用已经获取到的推荐问题（如果没有则为空数组）
+                  answerMethod: normalizedAnswerMethod,
+                  relatedQuestions: existingRelatedQuestions,
                 }
               };
-              
-              // Button will be shown automatically in AnswerCard based on answerMethod
             }
           }
           return newHistory;
         });
+        
+        setCurrentAnswer('');
       },
       // onError: 错误处理
       (error) => {
@@ -383,9 +374,22 @@ function App({ cId = '' }) {
               <MorningBriefing 
                 onTalkToAssistant={handleTalkToAssistant} 
                 cId={cId}
+                hasPreloaded={hasPreloadedQuestionsRef.current}
+                cachedPlayContent={playContentCacheRef.current}
+                isLoadingPlayContent={isLoadingPlayContentRef.current}
                 onQuestionsPreloaded={(questions) => {
                   // 预加载的推荐问题存储到App状态中
                   setStarterQuestions(questions);
+                  hasPreloadedQuestionsRef.current = true; // 标记已加载
+                }}
+                onPlayContentLoaded={(content) => {
+                  // 缓存播放内容
+                  playContentCacheRef.current = content;
+                  isLoadingPlayContentRef.current = false;
+                }}
+                onPlayContentLoadingChange={(loading) => {
+                  // 更新加载状态
+                  isLoadingPlayContentRef.current = loading;
                 }}
               />
             </motion.div>
@@ -418,7 +422,8 @@ function App({ cId = '' }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex-1 flex flex-col h-full relative bg-gradient-to-b from-gray-50 to-gray-100"
+              className="flex-1 flex flex-col h-full relative bg-gradient-to-b from-gray-50 to-gray-100 min-h-0"
+              style={{ height: '100%', maxHeight: '100dvh' }}
             >
               {/* Header - Apple Style Blur */}
               <header className="px-5 py-3 flex items-center justify-between bg-gradient-to-b from-gray-50 to-gray-100 backdrop-blur-xl sticky top-0 z-30 flex-none transition-all duration-300">
@@ -437,10 +442,10 @@ function App({ cId = '' }) {
               </header>
 
               {/* Scrollable Chat Area */}
-              <div className="flex-1 overflow-y-auto px-0 py-6 space-y-2 no-scrollbar scroll-smooth">
+              <div className="flex-1 overflow-y-auto px-0 py-6 space-y-2 no-scrollbar scroll-smooth min-h-0">
                 {/* Empty State: Center Content */}
                 {chatHistory.length === 0 && (
-                  <div className="h-full flex flex-col justify-center items-center pb-20">
+                  <div className="h-full flex flex-col justify-center items-center pb-32 min-h-0">
                     {/* Welcome Icon */}
                     <div className="mb-6">
                       <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-gray-200">
@@ -466,35 +471,39 @@ function App({ cId = '' }) {
                 )}
 
                 {/* Chat History */}
-                {chatHistory.map((item, index) => (
-                  <AnswerCard
-                    key={index}
-                    question={item.question}
-                    answer={item.answer}
-                    onQuestionSelect={handleSearch}
-                    showRelated={index === chatHistory.length - 1}
-                    onTextJames={() => {
-                      setIsSheetOpen(true);
-                    }}
-                    agentName={agentInfo.name}
-                    onNotNow={() => {
-                      // Hide the button by updating the answer
-                      setChatHistory(prev => {
-                        const newHistory = [...prev];
-                        if (newHistory[index]) {
-                          newHistory[index] = {
-                            ...newHistory[index],
-                            answer: {
-                              ...newHistory[index].answer,
-                              answerMethod: null, // Remove answerMethod to hide button
-                            }
-                          };
-                        }
-                        return newHistory;
-                      });
-                    }}
-                  />
-                ))}
+                {chatHistory.map((item, index) => {
+                  const isLastMessage = index === chatHistory.length - 1;
+                  return (
+                    <AnswerCard
+                      key={index}
+                      question={item.question}
+                      answer={item.answer}
+                      onQuestionSelect={handleSearch}
+                      showRelated={isLastMessage}
+                      onTextJames={() => {
+                        setIsSheetOpen(true);
+                      }}
+                      agentName={agentInfo.name}
+                      answerStartRef={isLastMessage ? answerStartRef : null}
+                      onNotNow={() => {
+                        // Hide the button by updating the answer
+                        setChatHistory(prev => {
+                          const newHistory = [...prev];
+                          if (newHistory[index]) {
+                            newHistory[index] = {
+                              ...newHistory[index],
+                              answer: {
+                                ...newHistory[index].answer,
+                                answerMethod: null, // Remove answerMethod to hide button
+                              }
+                            };
+                          }
+                          return newHistory;
+                        });
+                      }}
+                    />
+                  );
+                })}
 
                 {isTyping && (
                   <motion.div
@@ -512,7 +521,7 @@ function App({ cId = '' }) {
               </div>
 
               {/* Input Area (Pinned Bottom) */}
-              <div className="flex-none z-20 px-4 pb-4">
+              <div className="flex-none z-20 px-4 pb-4 pt-2 safe-area-inset-bottom" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
                 <InputSection
                   onSearch={handleSearch}
                   isCompact={chatHistory.length > 0}
@@ -532,6 +541,7 @@ function App({ cId = '' }) {
         agentName={agentInfo.name}
         phone={agentInfo.phone}
         email={agentInfo.email}
+        cId={cId}
       />
     </MobileContainer>
   );

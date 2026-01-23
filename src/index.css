@@ -6,4 +6,19 @@
   body {
     @apply bg-gray-100 text-slate-900 font-sans antialiased selection:bg-sothebys-navy selection:text-white;
   }
+  
+  /* 移动端视口高度适配 */
+  html, body, #root {
+    height: 100%;
+    min-height: 100dvh;
+  }
+  
+  /* 安全区域支持 */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
 }

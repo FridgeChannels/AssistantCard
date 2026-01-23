@@ -1,18 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Mail, MessageSquare } from 'lucide-react';
+import { X, Mail, MessageSquare, Loader2 } from 'lucide-react';
 import { getDocumentSummary } from '../../lib/documentSummaryService';
 
-export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agentName = 'James', phone = '', email = '' }) {
-    const [isSent, setIsSent] = useState(false);
+export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agentName = 'James', phone = '', email = '', cId = '' }) {
     const [documentSummary, setDocumentSummary] = useState({ email: '', message: '' });
     const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+    const [pendingAction, setPendingAction] = useState(null); // 'sms' 或 'email' 或 null
+
+    // 替换占位符 [agentName] 为实际的 agentName
+    const replacePlaceholder = useCallback((text) => {
+        if (!text) return text;
+        return text.replace(/\[agentName\]/g, agentName);
+    }, [agentName]);
 
     // 当对话框打开时，调用接口B获取文档总结
     useEffect(() => {
         if (isOpen && guideContent) {
             setIsLoadingSummary(true);
-            getDocumentSummary(guideContent)
+            setPendingAction(null); // 重置待处理操作
+            getDocumentSummary(guideContent, agentName, cId)
                 .then(summary => {
                     setDocumentSummary(summary);
                     setIsLoadingSummary(false);
@@ -26,36 +33,66 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
         } else if (isOpen) {
             // 如果没有guide内容，清空文档总结
             setDocumentSummary({ email: '', message: '' });
+            setPendingAction(null); // 重置待处理操作
+        } else {
+            // 对话框关闭时重置状态
+            setPendingAction(null);
         }
     }, [isOpen, guideContent]);
 
-    const handleSendSMS = () => {
-        if (phone) {
-            // 使用sms:协议发送短信，包含body参数
-            // 优先使用接口B返回的message，如果没有则使用context
-            const messageBody = documentSummary.message || context || '';
-            const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
-            const body = encodeURIComponent(messageBody);
-            window.location.href = `sms:${formattedPhone}?body=${body}`;
+    // 当接口加载完成且有待处理的操作时，自动执行
+    useEffect(() => {
+        if (!isLoadingSummary && pendingAction) {
+            if (pendingAction === 'sms' && phone) {
+                const messageBody = replacePlaceholder(documentSummary.message) || context || '';
+                const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+                const body = encodeURIComponent(messageBody);
+                window.location.href = `sms:${formattedPhone}?body=${body}`;
+                onClose();
+                setPendingAction(null);
+            } else if (pendingAction === 'email' && email) {
+                const emailBody = replacePlaceholder(documentSummary.email) || context || 'Hi there';
+                const subject = encodeURIComponent('Contact');
+                const body = encodeURIComponent(emailBody);
+                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                onClose();
+                setPendingAction(null);
+            }
         }
-        setIsSent(true);
-        setTimeout(() => {
-            setIsSent(false);
-            onClose();
-        }, 2000);
+    }, [isLoadingSummary, pendingAction, documentSummary, context, phone, email, onClose, replacePlaceholder]);
+
+    const handleSendSMS = () => {
+        if (!phone) return;
+
+        // 如果接口还在加载中，记录待处理的操作
+        if (isLoadingSummary) {
+            setPendingAction('sms');
+            return;
+        }
+
+        // 接口已加载完成，直接发送
+        const messageBody = replacePlaceholder(documentSummary.message) || context || '';
+        const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+        const body = encodeURIComponent(messageBody);
+        window.location.href = `sms:${formattedPhone}?body=${body}`;
+        onClose();
     };
 
     const handleSendEmail = () => {
-        if (email) {
-            // 使用mailto:协议发送邮件，包含subject和body参数
-            // 优先使用接口B返回的email内容，如果没有则使用context
-            const emailBody = documentSummary.email || context || 'Hi there';
-            const subject = encodeURIComponent('Contact');
-            const body = encodeURIComponent(emailBody);
-            window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-            // 邮件客户端打开后关闭对话框
-            onClose();
+        if (!email) return;
+
+        // 如果接口还在加载中，记录待处理的操作
+        if (isLoadingSummary) {
+            setPendingAction('email');
+            return;
         }
+
+        // 接口已加载完成，直接发送
+        const emailBody = replacePlaceholder(documentSummary.email) || context || 'Hi there';
+        const subject = encodeURIComponent('Contact');
+        const body = encodeURIComponent(emailBody);
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        onClose();
     };
 
     return (
@@ -91,47 +128,41 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                             </button>
                         </div>
 
-                        {isSent ? (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="flex flex-col items-center py-10 text-center"
-                            >
-                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                                    <Send className="w-8 h-8 text-green-600" />
-                                </div>
-                                <h4 className="text-lg font-semibold text-green-700">Message Sent!</h4>
-                                <p className="text-gray-500">Your agent will reply shortly.</p>
-                            </motion.div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase">Context</span>
-                                    <p className="text-gray-700 text-sm mt-1 line-clamp-2">
-                                        {context || "Asking about closing costs and timeline..."}
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        onClick={handleSendSMS}
-                                        disabled={!phone}
-                                        className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <MessageSquare className="w-6 h-6 mb-2" />
-                                        <span className="font-medium">Text {agentName}</span>
-                                    </button>
-                                    <button
-                                        onClick={handleSendEmail}
-                                        disabled={!email}
-                                        className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Mail className="w-6 h-6 mb-2" />
-                                        <span className="font-medium">Send Email</span>
-                                    </button>
-                                </div>
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <span className="text-xs font-semibold text-gray-400 uppercase">Context</span>
+                                <p className="text-gray-700 text-sm mt-1 line-clamp-2">
+                                    {context || "Asking about closing costs and timeline..."}
+                                </p>
                             </div>
-                        )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={handleSendSMS}
+                                    disabled={!phone || (isLoadingSummary && pendingAction === 'sms')}
+                                    className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoadingSummary && pendingAction === 'sms' ? (
+                                        <Loader2 className="w-6 h-6 mb-2 animate-spin" />
+                                    ) : (
+                                        <MessageSquare className="w-6 h-6 mb-2" />
+                                    )}
+                                    <span className="font-medium">Text {agentName}</span>
+                                </button>
+                                <button
+                                    onClick={handleSendEmail}
+                                    disabled={!email || (isLoadingSummary && pendingAction === 'email')}
+                                    className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoadingSummary && pendingAction === 'email' ? (
+                                        <Loader2 className="w-6 h-6 mb-2 animate-spin text-sothebys-navy" />
+                                    ) : (
+                                        <Mail className="w-6 h-6 mb-2" />
+                                    )}
+                                    <span className="font-medium">Send Email</span>
+                                </button>
+                            </div>
+                        </div>
                     </motion.div>
                 </>
             )}

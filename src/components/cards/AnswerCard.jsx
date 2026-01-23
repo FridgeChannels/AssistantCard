@@ -4,7 +4,7 @@ import { ArrowRight, MessageSquare, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
 
-export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James' }) {
+export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef }) {
     if (!answer) return null;
 
     return (
@@ -21,8 +21,9 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 </div>
             </motion.div>
 
-            {/* Assistant Bubble */}
+            {/* Assistant Bubble - 答案开始位置标记 */}
             <motion.div
+                ref={answerStartRef}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
@@ -63,18 +64,31 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                         </div>
                     </div>
 
-                    {/* Text James Button - Show if answerMethod indicates guide/direct */}
-                    {answer.answerMethod && (answer.answerMethod === 'guide' || answer.answerMethod === 'guide/direct' || answer.answerMethod === 'direct') && (
+                    {/* Text James Button - Show if answerMethod indicates guide/direct and answer is complete */}
+                    {answer.type !== 'loading' && answer.answerMethod && (answer.answerMethod === 'guide' || answer.answerMethod === 'guide/direct' || answer.answerMethod === 'direct') && (
                         <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
+                            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ 
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 30,
+                                delay: 0.15
+                            }}
                             className="mt-3 pl-1"
                         >
                             <div className={`flex gap-3 ${answer.answerMethod === 'direct' ? 'justify-start' : ''}`}>
-                                {answer.answerMethod !== 'direct' && onNotNow && (
+                                {onNotNow && (
                                     <motion.button
                                         onClick={onNotNow}
+                                        initial={{ opacity: 0, x: -8 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ 
+                                            type: "spring",
+                                            stiffness: 400,
+                                            damping: 30,
+                                            delay: 0.2
+                                        }}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                         className="px-5 py-3 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] font-semibold text-sm shadow-sm hover:shadow-md hover:border-sothebys-navy/20 transition-all"
@@ -85,6 +99,14 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                                 {onTextJames && (
                                     <motion.button
                                         onClick={onTextJames}
+                                        initial={{ opacity: 0, x: -8 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ 
+                                            type: "spring",
+                                            stiffness: 400,
+                                            damping: 30,
+                                            delay: 0.25
+                                        }}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                         className={`${answer.answerMethod === 'direct' ? 'flex-1' : ''} flex items-center justify-center gap-2 px-5 py-3 bg-green-400 text-white rounded-[30px] font-semibold text-sm shadow-[0_4px_12px_rgba(74,222,128,0.3)] hover:bg-green-500 transition-all`}
@@ -100,24 +122,60 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 </div>
             </motion.div>
 
-            {/* Related Questions (Loop) - Only show if enabled (e.g. latest message) */}
-            {showRelated && answer.relatedQuestions && answer.relatedQuestions.length > 0 && (
+            {/* Related Questions (Loop) - Only show if enabled (e.g. latest message) and answer is complete */}
+            {(() => {
+                // 推荐问题不依赖于 answerMethod，只依赖于 showRelated、relatedQuestions 和答案是否完成
+                const shouldShow = answer.type !== 'loading' && showRelated && answer.relatedQuestions && answer.relatedQuestions.length > 0;
+                if (showRelated) {
+                    console.log('AnswerCard - showRelated check:', {
+                        answerType: answer.type,
+                        answerMethod: answer.answerMethod,
+                        showRelated,
+                        hasRelatedQuestions: !!answer.relatedQuestions,
+                        relatedQuestionsLength: answer.relatedQuestions?.length || 0,
+                        shouldShow
+                    });
+                }
+                return shouldShow;
+            })() && (
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ 
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 28,
+                        delay: 0.3
+                    }}
                     className="pl-14 pr-2 pt-2"
                 >
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block pl-1">You may worried about too...</span>
+                    <motion.span 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.35 }}
+                        className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block pl-1"
+                    >
+                        You may worried about too...
+                    </motion.span>
                     <div className="flex flex-col gap-2">
                         {answer.relatedQuestions.map((q, i) => (
-                            <button
+                            <motion.button
                                 key={i}
+                                initial={{ opacity: 0, x: -12, scale: 0.95 }}
+                                animate={{ opacity: 1, x: 0, scale: 1 }}
+                                transition={{ 
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 30,
+                                    delay: 0.4 + i * 0.05
+                                }}
                                 onClick={() => onQuestionSelect(q)}
-                                className="text-left px-4 py-1.5 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy text-sm font-medium hover:bg-blue-300 transition-all active:scale-[0.99]"
+                                whileHover={{ scale: 1.02, x: 2 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="text-left px-4 py-1.5 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy text-sm font-medium hover:bg-blue-300 transition-all"
                             >
                                 {q}
-                            </button>
+                            </motion.button>
                         ))}
                     </div>
                 </motion.div>

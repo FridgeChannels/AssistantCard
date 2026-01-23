@@ -15,9 +15,10 @@ export async function getTodayPlayContent(customerId = null) {
         const today = new Date().toISOString().split('T')[0]
 
         // 构建查询条件 - 先查询当天的内容
+        // 只选择需要的字段：title, id, audio_url
         let query = supabase
             .from('play_contents')
-            .select('*')
+            .select('id, title, audio_url')
             .eq('scheduled_date', today)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -61,9 +62,10 @@ export async function getTodayPlayContent(customerId = null) {
  */
 export async function getLatestPlayContent(customerId = null) {
     try {
+        // 只选择需要的字段：title, id, audio_url
         let query = supabase
             .from('play_contents')
-            .select('*')
+            .select('id, title, audio_url')
             .order('scheduled_date', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(1)

@@ -4,13 +4,23 @@ import { Mic, Play, Pause, AlertCircle } from 'lucide-react';
 import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 
-export function MorningBriefing({ onTalkToAssistant, cId = '', onQuestionsPreloaded }) {
+export function MorningBriefing({ 
+    onTalkToAssistant, 
+    cId = '', 
+    hasPreloaded = false, 
+    onQuestionsPreloaded,
+    cachedPlayContent = null,
+    isLoadingPlayContent = false,
+    onPlayContentLoaded,
+    onPlayContentLoadingChange
+}) {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [playContent, setPlayContent] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [playContent, setPlayContent] = useState(cachedPlayContent); // 使用缓存的播放内容
+    const [isLoading, setIsLoading] = useState(!cachedPlayContent); // 如果有缓存，不需要加载状态
     const [error, setError] = useState(null);
     const [audioElement, setAudioElement] = useState(null);
     const hasPreloadedQuestions = useRef(false); // 防止重复调用接口A
+    const hasLoadedPlayContent = useRef(false); // 防止重复加载播放内容
 
     const currentDate = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -20,22 +30,93 @@ export function MorningBriefing({ onTalkToAssistant, cId = '', onQuestionsPreloa
     const day = currentDate.getDate();
     const dateString = `${dayName}, ${monthName} ${day}`;
 
-    // Load play content
+    // 懒加载推荐问题：页面加载时立即触发（如果还没有加载过）
     useEffect(() => {
+        // 如果已经加载过，不再重复加载
+        if (hasPreloadedQuestions.current || hasPreloaded || !cId) {
+            return;
+        }
+        
+        // 立即调用接口A获取推荐问题（懒加载）
+        hasPreloadedQuestions.current = true; // 标记已调用
+        getRelatedQuestions(cId, '').then(questions => {
+            if (questions && questions.length > 0 && onQuestionsPreloaded) {
+                onQuestionsPreloaded(questions);
+            }
+        }).catch(error => {
+            console.error('获取推荐问题失败:', error);
+            hasPreloadedQuestions.current = false; // 失败时重置，允许重试
+        });
+    }, [cId, hasPreloaded, onQuestionsPreloaded]);
+
+    // 如果有缓存的播放内容，直接使用（优先使用缓存）
+    useEffect(() => {
+        if (cachedPlayContent) {
+            setPlayContent(cachedPlayContent);
+            setIsLoading(false);
+            hasLoadedPlayContent.current = true; // 标记已加载，避免重复请求
+            
+            // 创建音频元素（如果还没有）
+            if (cachedPlayContent.audio_url) {
+                // 使用函数式更新来避免依赖 audioElement
+                setAudioElement(prev => {
+                    if (prev) {
+                        return prev; // 如果已经存在，不重复创建
+                    }
+                    const audio = new Audio(cachedPlayContent.audio_url);
+                    audio.addEventListener('ended', () => {
+                        setIsPlaying(false);
+                    });
+                    audio.addEventListener('error', (e) => {
+                        console.error('Audio loading issue:', e);
+                        setError('Audio is not ready yet');
+                    });
+                    return audio;
+                });
+            }
+        }
+    }, [cachedPlayContent]); // 只依赖 cachedPlayContent
+
+    // Load play content - 只在首次加载时请求，或重新加载页面时请求
+    useEffect(() => {
+        // 如果有缓存，或者正在加载，或者已经加载过，不再重复请求
+        if (cachedPlayContent || isLoadingPlayContent || hasLoadedPlayContent.current) {
+            return;
+        }
+
         async function loadPlayContent() {
+            // 防止并发请求：再次检查状态
+            if (hasLoadedPlayContent.current || isLoadingPlayContent || cachedPlayContent) {
+                return;
+            }
+            
+            hasLoadedPlayContent.current = true;
+            
             try {
                 setIsLoading(true);
                 setError(null);
+                if (onPlayContentLoadingChange) {
+                    onPlayContentLoadingChange(true);
+                }
 
                 // Fetch today's play content (pass null to get global content)
                 const content = await getTodayPlayContent(null);
 
                 if (!content) {
                     setError('No content available at the moment');
+                    if (onPlayContentLoadingChange) {
+                        onPlayContentLoadingChange(false);
+                    }
+                    hasLoadedPlayContent.current = false; // 失败时允许重试
                     return;
                 }
 
                 setPlayContent(content);
+                
+                // 通知父组件缓存内容
+                if (onPlayContentLoaded) {
+                    onPlayContentLoaded(content);
+                }
 
                 // Create audio element if audio URL exists
                 if (content.audio_url) {
@@ -47,40 +128,18 @@ export function MorningBriefing({ onTalkToAssistant, cId = '', onQuestionsPreloa
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
-                    // 当音频可以播放时（加载完成），调用接口A获取推荐问题
-                    const handleCanPlay = () => {
-                        // 防止重复调用：如果已经调用过，就不再调用
-                        if (hasPreloadedQuestions.current) {
-                            return;
-                        }
-                        
-                        // 音频加载完成后调用接口A获取推荐问题（预加载）
-                        if (cId) {
-                            hasPreloadedQuestions.current = true; // 标记已调用
-                            getRelatedQuestions(cId, '').then(questions => {
-                                if (questions && questions.length > 0 && onQuestionsPreloaded) {
-                                    onQuestionsPreloaded(questions);
-                                }
-                            }).catch(error => {
-                                console.error('获取推荐问题失败:', error);
-                                hasPreloadedQuestions.current = false; // 失败时重置，允许重试
-                            });
-                        }
-                    };
-                    audio.addEventListener('canplay', handleCanPlay, { once: true }); // 使用 once 选项，只触发一次
                     setAudioElement(audio);
-                    
-                    // 如果音频已经可以播放（可能已经缓存），立即调用接口A
-                    if (audio.readyState >= 3 && !hasPreloadedQuestions.current) { // HAVE_FUTURE_DATA or higher
-                        handleCanPlay();
-                    }
                 }
 
             } catch (err) {
                 console.error('Content loading issue:', err);
                 setError('Please try again in a moment');
+                hasLoadedPlayContent.current = false; // 失败时允许重试
             } finally {
                 setIsLoading(false);
+                if (onPlayContentLoadingChange) {
+                    onPlayContentLoadingChange(false);
+                }
             }
         }
 
@@ -92,10 +151,10 @@ export function MorningBriefing({ onTalkToAssistant, cId = '', onQuestionsPreloa
                 audioElement.pause();
                 audioElement.src = '';
             }
-            // 重置预加载标志
-            hasPreloadedQuestions.current = false;
+            // 注意：不重置 hasLoadedPlayContent.current，因为已经加载过的内容应该保留
+            // 重置逻辑由 App.jsx 中的 playContentCacheRef 统一管理
         };
-    }, [cId]); // 添加 cId 作为依赖，当 cId 变化时重新加载
+    }, []); // 只在组件首次挂载时执行，不依赖任何变量
 
     const handlePlay = () => {
         if (!audioElement) {

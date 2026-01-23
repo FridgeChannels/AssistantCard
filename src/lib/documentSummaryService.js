@@ -9,12 +9,22 @@ const API_TOKEN = import.meta.env.VITE_DOCUMENT_SUMMARY_API_TOKEN || 'app-4dXrzm
 /**
  * 获取文档总结内容
  * @param {string} query - 查询内容（guide状态下返回的内容）
+ * @param {string} agentName - 代理名称
+ * @param {string} cId - 客户ID（从路由获取）
  * @returns {Promise<{email: string, message: string}>} 包含email和message的对象
  */
-export async function getDocumentSummary(query) {
+export async function getDocumentSummary(query, agentName, cId) {
   try {
     if (!query) {
       console.warn('查询内容为空');
+      return {
+        email: '',
+        message: ''
+      };
+    }
+
+    if (!cId) {
+      console.warn('客户ID (cId) 未提供');
       return {
         email: '',
         message: ''
@@ -28,7 +38,10 @@ export async function getDocumentSummary(query) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: {},
+        inputs: {
+          agent_name: agentName,
+          megnet_id: cId,
+        },
         query: query,
         response_mode: 'streaming',
         conversation_id: '',

@@ -65,8 +65,8 @@ export function AssistantChat({ stage }) {
     };
 
     return (
-        <div className="flex flex-col flex-1 overflow-hidden bg-white relative">
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6" ref={scrollRef}>
+        <div className="flex flex-col flex-1 overflow-hidden bg-white relative min-h-0" style={{ height: '100%', maxHeight: '100dvh' }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 min-h-0" ref={scrollRef}>
                 {messages.map((msg) => (
                     <motion.div
                         key={msg.id}
@@ -116,7 +116,7 @@ export function AssistantChat({ stage }) {
 
             <QuickQuestions onSelect={handleSend} stage={stage} />
 
-            <div className="p-4 bg-white border-t border-gray-100">
+            <div className="flex-none p-4 bg-white border-t border-gray-100 safe-area-inset-bottom" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
                 <form
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                     className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 pr-2 border border-green-200/0 focus-within:border-sothebys-navy/20 focus-within:bg-white focus-within:shadow-md transition-all"
@@ -131,9 +131,9 @@ export function AssistantChat({ stage }) {
                         className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-gray-400 min-w-0"
                     />
                     <button
-                        type="disabled"
+                        type="submit"
                         disabled={!input.trim()}
-                        className="w-10 h-10 rounded-[30px] bg-sothebys-navy/90 backdrop-blur-[20px] flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all shadow-md border border-white/10"
+                        className="w-10 h-10 rounded-full bg-sothebys-navy/90 backdrop-blur-[20px] flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all shadow-md border border-white/10"
                     >
                         <Send className="w-4 h-4 ml-0.5" />
                     </button>

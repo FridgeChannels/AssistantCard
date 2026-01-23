@@ -253,6 +253,7 @@ export async function sendChatMessageStream(
     let buffer = '';
     let fullAnswer = '';
     let newConversationId = conversationId;
+    let extractedAnswerMethod = null; // Track answer_method from stream
 
     while (true) {
       const { done, value } = await reader.read();
@@ -300,6 +301,11 @@ export async function sendChatMessageStream(
               onChunk?.(data.answer);
             }
             
+            // Extract answer_method from JSON if present
+            if (data.answer_method) {
+              extractedAnswerMethod = data.answer_method;
+            }
+            
             // Extract conversation_id from JSON if present
             if (data.conversation_id) {
               newConversationId = data.conversation_id;
@@ -336,6 +342,11 @@ export async function sendChatMessageStream(
               onChunk?.(data.answer);
             }
             
+            // Extract answer_method from JSON if present
+            if (data.answer_method) {
+              extractedAnswerMethod = data.answer_method;
+            }
+            
             // Extract conversation_id if present
             if (data.conversation_id) {
               newConversationId = data.conversation_id;
@@ -353,7 +364,7 @@ export async function sendChatMessageStream(
       }
     }
 
-    onComplete?.(fullAnswer || "I'm sorry, I didn't receive a valid response. Please try again.", newConversationId, undefined);
+    onComplete?.(fullAnswer || "I'm sorry, I didn't receive a valid response. Please try again.", newConversationId, extractedAnswerMethod || undefined);
   } catch (error) {
     console.error('Chat API call failed:', error);
     onError?.(error);
