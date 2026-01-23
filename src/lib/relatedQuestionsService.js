@@ -4,6 +4,7 @@
  */
 
 import { env } from '../config/env.js';
+import { supabase } from './supabase.js';
 
 const API_URL = env.RELATED_QUESTIONS_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
 const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0cU';
@@ -16,8 +17,26 @@ const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0
  */
 export async function getRelatedQuestions(cId, conversationId = '') {
   try {
+    let stage = '';
+
     if (!cId) {
       console.warn('Customer ID (cId) 未提供，使用空字符串');
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('magnet')
+          .select('stage')
+          .eq('id', cId)
+          .single();
+
+        if (error) {
+          console.warn('获取 stage 失败:', error);
+        } else if (data) {
+          stage = data.stage;
+        }
+      } catch (err) {
+        console.warn('查询 magnet 表异常:', err);
+      }
     }
 
     const response = await fetch(API_URL, {
@@ -28,9 +47,10 @@ export async function getRelatedQuestions(cId, conversationId = '') {
       },
       body: JSON.stringify({
         inputs: {
-          megnet_id: cId || '',
+          magnet_id: cId || '',
+          stage: stage || '',
         },
-        query: '随便填',
+        query: 'anything',
         response_mode: 'streaming',
         conversation_id: '',
         user: cId || 'abc-123',
