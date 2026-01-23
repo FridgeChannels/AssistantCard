@@ -30,7 +30,6 @@ COPY package*.json ./
 
 # 只安装生产依赖
 RUN npm ci --omit=dev && \
-    npm install serve && \
     npm cache clean --force
 
 # 从构建阶段复制构建产物
