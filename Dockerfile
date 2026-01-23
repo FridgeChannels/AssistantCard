@@ -28,9 +28,9 @@ RUN npm install -g pm2
 # 复制 package.json 文件
 COPY package*.json ./
 
-# 只安装生产依赖和 vite（preview 需要）
+# 只安装生产依赖
 RUN npm ci --omit=dev && \
-    npm install vite && \
+    npm install serve && \
     npm cache clean --force
 
 # 从构建阶段复制构建产物

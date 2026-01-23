@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "serve dist -l 4173 -s"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.91.0",
@@ -18,6 +19,7 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.12.0",
+    "serve": "^14.2.4",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

@@ -7,22 +7,10 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 4173,
-    strictPort: true,
-    cors: true,
-    proxy: {},
-    allowedHosts: [
-      'tap.fridgechannels.com',
-      'localhost',
-      '.fridgechannels.com', // 允许所有 fridgechannels.com 子域名
-    ],
   },
   server: {
     host: '0.0.0.0',
     cors: true,
-    allowedHosts: [
-      'tap.fridgechannels.com',
-      'localhost',
-      '.fridgechannels.com',
-    ],
+    allowedHosts: 'all', // 禁用 Host 头验证，允许所有域名访问
   },
 })
