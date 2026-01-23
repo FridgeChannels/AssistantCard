@@ -10,6 +10,11 @@ export default defineConfig({
     strictPort: true,
     cors: true,
     proxy: {},
+    allowedHosts: [
+      'tap.fridgechannels.com',
+      'localhost',
+      '.fridgechannels.com', // 允许所有 fridgechannels.com 子域名
+    ],
   },
   server: {
     host: '0.0.0.0',
