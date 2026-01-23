@@ -34,10 +34,10 @@ COPY --from=builder /app/vite.config.js ./
 RUN npm ci && npm cache clean --force
 
 # 复制 pm2 配置文件
-COPY ecosystem.config.js ./
+COPY ecosystem.config.cjs ./
 
 # 暴露端口（vite preview 默认使用 4173）
 EXPOSE 4173
 
 # 使用 pm2 启动应用
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]
