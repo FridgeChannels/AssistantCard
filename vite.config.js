@@ -8,5 +8,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 4173,
     strictPort: true,
+    cors: true,
+    proxy: {},
+  },
+  server: {
+    host: '0.0.0.0',
+    cors: true,
   },
 })
