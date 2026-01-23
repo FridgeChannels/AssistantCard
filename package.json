@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "serve dist -l 4173 -s"
+    "start": "serve dist -p 4173 -s"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.91.0",
