@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { logUserAction } from '../../lib/loggingService';
+import { Glass } from '../layout/Glass';
 
 export function StarterQuestions({
     onSelect,
@@ -114,7 +115,7 @@ export function StarterQuestions({
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Where to start?</span>
                 <button
                     onClick={handleRefresh}
-                    className="absolute right-0 p-2 text-gray-400 hover:text-sothebys-navy bg-white/60 backdrop-blur-[20px] hover:bg-white/80 rounded-[30px] transition-colors border border-white/40"
+                    className="absolute right-0 p-2 text-gray-400 hover:text-sothebys-navy bg-white/20 backdrop-blur-[20px] hover:bg-white/40 rounded-[30px] transition-colors border border-white/40"
                 >
                     <RefreshCw className="w-4 h-4" />
                 </button>
@@ -149,9 +150,11 @@ export function StarterQuestions({
                                     });
                                     onSelect(q);
                                 }}
-                                className="w-full text-center px-6 py-2 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy font-medium cursor-pointer hover:bg-blue-300 transition-all"
+                                className="w-full"
                             >
-                                {q}
+                                <Glass variant="pill" className="w-full text-center px-6 py-2 text-sothebys-navy font-medium cursor-pointer hover:opacity-90 transition-opacity">
+                                    {q}
+                                </Glass>
                             </motion.button>
                         ))}
                     </AnimatePresence>

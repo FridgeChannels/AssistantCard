@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Mic, ArrowUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import { Glass } from '../layout/Glass';
 
 export function InputSection({ onSearch, isCompact, initialValue = "" }) {
     const [input, setInput] = useState(initialValue);
@@ -49,8 +50,9 @@ export function InputSection({ onSearch, isCompact, initialValue = "" }) {
         <motion.div
             layout
             onClick={handleContainerClick}
-            className="w-full max-w-[90%] mx-auto bg-gray-200/60 backdrop-blur-[30px] rounded-full flex items-center px-4 py-2 space-x-3 cursor-pointer"
+            className="w-full max-w-[90%] mx-auto cursor-pointer"
         >
+            <Glass variant="pill" className="flex items-center px-4 py-2 space-x-3">
             <input
                 ref={inputRef}
                 type="text"
@@ -84,6 +86,7 @@ export function InputSection({ onSearch, isCompact, initialValue = "" }) {
             >
                 <ArrowUp className="w-5 h-5 text-white" />
             </button>
+            </Glass>
         </motion.div>
     );
 }

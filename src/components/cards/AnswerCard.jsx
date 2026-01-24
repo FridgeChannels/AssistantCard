@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, MessageSquare, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
+import { Glass } from '../layout/Glass';
 
 export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef }) {
     if (!answer) return null;
@@ -16,8 +17,10 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="flex justify-end items-end gap-2"
             >
-                <div className="bg-gradient-to-br from-[#007AFF] to-[#005ECB] text-white px-5 py-3 rounded-2xl rounded-br-sm shadow-[0_2px_8px_rgba(0,122,255,0.25)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium">
-                    {question}
+                <div className="bg-[#007AFF]/80 backdrop-blur-[12px] border border-white/20 text-white px-5 py-3 rounded-[24px] rounded-br-sm shadow-[0_8px_20px_rgba(0,122,255,0.3)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium relative overflow-hidden">
+                    {/* Inner highlight for glass feel */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                    <div className="relative z-10">{question}</div>
                 </div>
             </motion.div>
 
@@ -31,16 +34,16 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
             >
                 {/* Assistant Avatar - Smaller & Subtler */}
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm ring-1 ring-gray-100 flex items-center justify-center flex-none mt-1">
-                    <img 
-                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face" 
-                        alt="Agent" 
+                    <img
+                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
+                        alt="Agent"
                         className="w-full h-full object-cover"
                     />
                 </div>
 
                 {/* Answer Content */}
                 <div className="flex-1 space-y-3 max-w-[90%]">
-                    <div className="bg-white/60 backdrop-blur-[20px] rounded-[24px] rounded-tl-sm shadow-[0_8px_32px_rgba(0,0,0,0.05)] border border-white/20 p-6 ring-1 ring-white/40">
+                    <Glass variant="card" cornerRadius={24} className="rounded-tl-sm p-6">
                         {/* Main Text - Support Markdown */}
                         <div className="text-[#1D1D1F] text-[17px] leading-relaxed tracking-normal font-normal">
                             <ReactMarkdown
@@ -62,14 +65,14 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                                 {answer.text || ''}
                             </ReactMarkdown>
                         </div>
-                    </div>
+                    </Glass>
 
                     {/* Contact James Button - Show if answerMethod indicates guide/direct and answer is complete */}
                     {answer.type !== 'loading' && answer.answerMethod && (answer.answerMethod === 'guide') && (
                         <motion.div
                             initial={{ opacity: 0, y: 8, scale: 0.96 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{ 
+                            transition={{
                                 type: "spring",
                                 stiffness: 400,
                                 damping: 30,
@@ -101,7 +104,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                                         onClick={onTextJames}
                                         initial={{ opacity: 0, x: -8 }}
                                         animate={{ opacity: 1, x: 0 }}
-                                        transition={{ 
+                                        transition={{
                                             type: "spring",
                                             stiffness: 400,
                                             damping: 30,
@@ -138,48 +141,48 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 }
                 return shouldShow;
             })() && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ 
-                        type: "spring",
-                        stiffness: 350,
-                        damping: 28,
-                        delay: 0.3
-                    }}
-                    className="pl-14 pr-2 pt-2"
-                >
-                    <motion.span 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.35 }}
-                        className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block pl-1"
+                    <motion.div
+                        initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{
+                            type: "spring",
+                            stiffness: 350,
+                            damping: 28,
+                            delay: 0.3
+                        }}
+                        className="pl-14 pr-2 pt-2"
                     >
-                        You may worried about too...
-                    </motion.span>
-                    <div className="flex flex-col gap-2">
-                        {answer.relatedQuestions.map((q, i) => (
-                            <motion.button
-                                key={i}
-                                initial={{ opacity: 0, x: -12, scale: 0.95 }}
-                                animate={{ opacity: 1, x: 0, scale: 1 }}
-                                transition={{ 
-                                    type: "spring",
-                                    stiffness: 400,
-                                    damping: 30,
-                                    delay: 0.4 + i * 0.05
-                                }}
-                                onClick={() => onQuestionSelect(q)}
-                                whileHover={{ scale: 1.02, x: 2 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="text-left px-4 py-1.5 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy text-sm font-medium hover:bg-blue-300 transition-all"
-                            >
-                                {q}
-                            </motion.button>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
+                        <motion.span
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.35 }}
+                            className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block pl-1"
+                        >
+                            You may worried about too...
+                        </motion.span>
+                        <div className="flex flex-col gap-2">
+                            {answer.relatedQuestions.map((q, i) => (
+                                <motion.button
+                                    key={i}
+                                    initial={{ opacity: 0, x: -12, scale: 0.95 }}
+                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 400,
+                                        damping: 30,
+                                        delay: 0.4 + i * 0.05
+                                    }}
+                                    onClick={() => onQuestionSelect(q)}
+                                    whileHover={{ scale: 1.02, x: 2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="text-left px-4 py-1.5 bg-blue-200 rounded-[30px] shadow-[0_8px_30px_rgba(0,122,255,0.1)] text-sothebys-navy text-sm font-medium hover:bg-blue-300 transition-all"
+                                >
+                                    {q}
+                                </motion.button>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
 
         </div>
     );

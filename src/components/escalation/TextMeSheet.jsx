@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Phone, Loader2 } from 'lucide-react';
 import { getDocumentSummary } from '../../lib/documentSummaryService';
 import { logUserAction } from '../../lib/loggingService';
+import { Glass } from '../layout/Glass';
 
 export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agentName = 'James', phone = '', email = '', cId = '' }) {
     const [documentSummary, setDocumentSummary] = useState({ email: '', message: '' });
@@ -137,28 +138,19 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+                        className="fixed inset-0 bg-black/5 backdrop-blur-sm z-50"
                     />
                     <motion.div
                         initial={{ y: "100%" }}
                         animate={{ y: 0 }}
                         exit={{ y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed bottom-0 left-0 right-0 h-fit bg-white/70 backdrop-blur-[30px] border-t border-white/20 rounded-t-[32px] z-50 p-6 pb-10 max-w-md mx-auto shadow-[0_-10px_40px_rgba(0,0,0,0.05)] ring-1 ring-white/40"
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[min(320px,calc(100vw-2rem))] h-fit z-50"
                     >
-                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+                        <Glass variant="panel" className="p-6">
+                            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
 
-                        <div className="space-y-4">
-                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 min-h-[3rem] w-full">
-                                <span className="text-xs font-semibold text-gray-400 uppercase">Message</span>
-                                <p className="text-gray-700 text-sm mt-1 whitespace-pre-wrap break-words">
-                                    {isLoadingSummary
-                                        ? 'Generating message...'
-                                        : replacePlaceholder(documentSummary.message) || context || '—'}
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-4">
                                 <button
                                     onClick={handleSendSMS}
                                     disabled={!phone || (isLoadingSummary && pendingAction === 'sms')}
@@ -174,13 +166,13 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                                 <button
                                     onClick={handleCallNow}
                                     disabled={!phone}
-                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-white/40 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/60 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Phone className="w-5 h-5 shrink-0" />
                                     <span className="font-medium">Call Now</span>
                                 </button>
                             </div>
-                        </div>
+                        </Glass>
                     </motion.div>
                 </>
             )}

@@ -412,7 +412,7 @@ function App({ cId = '' }) {
   };
 
   return (
-    <MobileContainer>
+    <MobileContainer backdropImage="/bg.png">
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
@@ -423,7 +423,7 @@ function App({ cId = '' }) {
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="flex-1 flex flex-col justify-center overflow-y-auto bg-gradient-to-b from-gray-50 to-gray-100"
+              className="flex-1 flex flex-col justify-center overflow-y-auto"
             >
               <IdentitySelector onSelect={handleRoleSelect} cId={cId} />
             </motion.div>
@@ -488,11 +488,19 @@ function App({ cId = '' }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex-1 flex flex-col h-full relative bg-gradient-to-b from-gray-50 to-gray-100 min-h-0"
+              className="flex-1 flex flex-col h-full relative min-h-0"
               style={{ height: '100%', maxHeight: '100dvh' }}
             >
               {/* Header - Apple Style Blur */}
-              <header className="px-5 py-3 flex items-center justify-between bg-gradient-to-b from-gray-50 to-gray-100 backdrop-blur-xl sticky top-0 z-30 flex-none transition-all duration-300">
+              <header className="px-5 py-3 flex items-center justify-between sticky top-0 z-30 flex-none transition-all duration-300 relative"
+                style={{
+                  background: 'transparent',
+                  backdropFilter: 'none',
+                  WebkitBackdropFilter: 'none',
+                  backgroundColor: 'transparent',
+                  borderBottom: 'none',
+                }}
+              >
                 <div className="flex items-center gap-3">
                   <button
                     onClick={handleBackToBriefing}

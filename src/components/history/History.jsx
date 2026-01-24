@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react';
+import { Glass } from '../layout/Glass';
 
 export function History({ onBack }) {
     const todaySessions = [
@@ -118,10 +119,7 @@ export function History({ onBack }) {
                     </div>
                     <div className="space-y-3">
                         {todaySessions.map((session) => (
-                            <div
-                                key={session.id}
-                                className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all"
-                            >
+                            <Glass key={session.id} variant="card" className="p-4 flex items-center gap-4 hover:opacity-90 transition-opacity">
                                 {getIcon(session.icon, session.iconColor)}
                                 <div className="flex-1 min-w-0">
                                     <h3 className="font-bold text-gray-900 text-base">{session.title}</h3>
@@ -132,7 +130,7 @@ export function History({ onBack }) {
                                     </div>
                                 </div>
                                 <span className="text-sm text-gray-400">{session.duration}</span>
-                            </div>
+                            </Glass>
                         ))}
                     </div>
                 </div>
@@ -145,10 +143,7 @@ export function History({ onBack }) {
                     </div>
                     <div className="space-y-3">
                         {yesterdaySessions.map((session) => (
-                            <div
-                                key={session.id}
-                                className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all"
-                            >
+                            <Glass key={session.id} variant="card" className="p-4 flex items-center gap-4 hover:opacity-90 transition-opacity">
                                 {getIcon(session.icon, session.iconColor)}
                                 <div className="flex-1 min-w-0">
                                     <h3 className="font-bold text-gray-900 text-base">{session.title}</h3>
@@ -159,7 +154,7 @@ export function History({ onBack }) {
                                     </div>
                                 </div>
                                 <span className="text-sm text-gray-400">{session.duration}</span>
-                            </div>
+                            </Glass>
                         ))}
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
+import { Glass } from '../layout/Glass';
 
 export function JamesInviteCard({ onTextJames, onNotNow, hideNotNow = false, agentName = 'James' }) {
     return (
@@ -13,14 +14,16 @@ export function JamesInviteCard({ onTextJames, onNotNow, hideNotNow = false, age
             {/* Action Buttons */}
             <div className={`flex gap-3 ${hideNotNow ? 'justify-start' : ''}`}>
                 {!hideNotNow && (
-                    <motion.button
-                        onClick={onNotNow}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="px-5 py-3 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] font-semibold text-sm shadow-sm hover:shadow-md hover:border-sothebys-navy/20 transition-all"
-                    >
-                        Not now
-                    </motion.button>
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <Glass variant="pill" className="px-5 py-3">
+                            <button
+                                onClick={onNotNow}
+                                className="text-sothebys-navy font-semibold text-sm w-full"
+                            >
+                                Not now
+                            </button>
+                        </Glass>
+                    </motion.div>
                 )}
                 <motion.button
                     onClick={onTextJames}
