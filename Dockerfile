@@ -34,6 +34,7 @@ RUN npm ci --omit=dev && \
 
 # 从构建阶段复制构建产物
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server ./server
 
 # 复制配置文件
 COPY vite.config.js ./

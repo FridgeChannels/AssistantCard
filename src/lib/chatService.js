@@ -1,12 +1,9 @@
 /**
  * Chat API Service
- * Handles interactions with the chat conversation API
+ * 前端只调用本地 /api/chat-messages，由后端代理请求真实的 Chat API
  */
 
-import { env } from '../config/env.js';
-
-const API_URL = env.CHAT_API_URL;
-const API_TOKEN = env.CHAT_API_TOKEN;
+const API_URL = '/api/chat-messages';
 
 /**
  * Send a chat message and handle streaming response
@@ -17,10 +14,6 @@ const API_TOKEN = env.CHAT_API_TOKEN;
  * @returns {Promise<{answer: string, conversationId: string}>}
  */
 export async function sendChatMessage(query, cId, conversationId = '', agentName = '') {
-  if (!API_URL || !API_TOKEN) {
-    throw new Error('Chat API configuration is missing. Please check your .env file.');
-  }
-
   if (!cId) {
     throw new Error('Customer ID (cId) is required.');
   }
@@ -29,7 +22,6 @@ export async function sendChatMessage(query, cId, conversationId = '', agentName
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -206,12 +198,6 @@ export async function sendChatMessageStream(
   onError,
   agentName = ''
 ) {
-  if (!API_URL || !API_TOKEN) {
-    const error = new Error('Chat API configuration is missing. Please check your .env file.');
-    onError?.(error);
-    return;
-  }
-
   if (!cId) {
     const error = new Error('Customer ID (cId) is required.');
     onError?.(error);
@@ -222,7 +208,6 @@ export async function sendChatMessageStream(
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

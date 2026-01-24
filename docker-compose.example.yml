@@ -10,9 +10,12 @@ services:
     ports:
       - "4173:4173"
     environment:
-      # Supabase 配置（示例值，请在实际部署时替换）
-      VITE_SUPABASE_URL: "https://YOUR_SUPABASE_PROJECT.supabase.co"
-      VITE_SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY"
+      # Supabase 配置（后端使用，推荐）
+      SUPABASE_URL: "https://YOUR_SUPABASE_PROJECT.supabase.co"
+      SUPABASE_SERVICE_ROLE_KEY: "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+      # 如仍需在前端直接使用 Supabase（不推荐），可保留以下 VITE_* 变量
+      # VITE_SUPABASE_URL: "https://YOUR_SUPABASE_PROJECT.supabase.co"
+      # VITE_SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY"
 
       # Chat API 配置（示例值，请在实际部署时替换）
       VITE_CHAT_API_URL: "https://YOUR_DIFY_OR_BACKEND_DOMAIN/v1/chat-messages"

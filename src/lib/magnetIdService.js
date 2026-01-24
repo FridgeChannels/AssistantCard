@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { apiGetMagnetIdBySn } from '../api/backendClient.js'
 
 // 全局缓存：sn -> magnet_id 映射
 const snToMagnetIdCache = new Map()
@@ -27,25 +27,13 @@ export async function getMagnetIdBySn(sn) {
   }
 
   try {
-    // 2. 通过 Supabase 查询 magnet 表
-    // 这里假设 magnet 表中已经有 sn 字段
-    const { data, error } = await supabase
-      .from('magnet')
-      .select('id')
-      .eq('sn', sn)
-      .maybeSingle()
+    // 2. 通过后端 API 查询 magnet.id（不在前端直接访问 supabase）
+    const magnetId = await apiGetMagnetIdBySn(sn)
 
-    if (error) {
-      console.error('根据 SN 查询 magnet.id 失败:', error)
-      return null
-    }
-
-    if (!data || !data.id) {
+    if (!magnetId) {
       console.warn('未找到对应 SN 的 magnet 记录:', sn)
       return null
     }
-
-    const magnetId = String(data.id)
 
     // 3. 写入缓存并记录当前上下文
     snToMagnetIdCache.set(sn, magnetId)

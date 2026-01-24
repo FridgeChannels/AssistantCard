@@ -41,8 +41,11 @@ docker-compose logs -f assistantcard
 docker run -d \
   --name assistantcard \
   -p 4173:4173 \
-  -e VITE_SUPABASE_URL="https://your-project.supabase.co" \
-  -e VITE_SUPABASE_ANON_KEY="your-anon-key" \
+  -e SUPABASE_URL="https://your-project.supabase.co" \
+  -e SUPABASE_SERVICE_ROLE_KEY="your-service-role-key" \
+  # 如仍需在前端直接使用 Supabase（不推荐），可额外设置以下变量
+  # -e VITE_SUPABASE_URL="https://your-project.supabase.co" \
+  # -e VITE_SUPABASE_ANON_KEY="your-anon-key" \
   -e VITE_CHAT_API_URL="https://your-api.com/v1/chat-messages" \
   -e VITE_CHAT_API_TOKEN="your-token" \
   -e VITE_RELATED_QUESTIONS_API_URL="https://your-api.com/v1/chat-messages" \
@@ -56,8 +59,10 @@ docker run -d \
 
 | 变量名 | 说明 | 必需 |
 |--------|------|------|
-| `VITE_SUPABASE_URL` | Supabase 项目 URL | 是 |
-| `VITE_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | 是 |
+| `SUPABASE_URL` | Supabase 项目 URL（后端使用） | 是 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role 密钥（仅在后端使用，不会暴露到前端） | 是 |
+| `VITE_SUPABASE_URL` | （可选）旧版前端 Supabase 项目 URL | 否 |
+| `VITE_SUPABASE_ANON_KEY` | （可选）旧版前端 Supabase 匿名密钥 | 否 |
 | `VITE_CHAT_API_URL` | 聊天 API 端点 | 是 |
 | `VITE_CHAT_API_TOKEN` | 聊天 API 令牌 | 是 |
 | `VITE_RELATED_QUESTIONS_API_URL` | 相关问题 API 端点 | 是 |
@@ -99,7 +104,7 @@ npm run dev
 
 1. 检查容器日志：`docker logs assistantcard`
 2. 验证 env-config.js 文件：`docker exec assistantcard cat /app/dist/env-config.js`
-3. 确保环境变量名称正确（必须以 `VITE_` 开头）
+3. 确保需要注入到前端的环境变量名称以 `VITE_` 开头（例如 `VITE_CHAT_API_URL`）
 
 ### 应用无法启动
 

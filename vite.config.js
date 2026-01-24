@@ -14,6 +14,6 @@ export default defineConfig({
     allowedHosts: [
       'jess-nonpunctuating-sniffily.ngrok-free.dev'
     ],
-    hmr: false
+    hmr: false,
   },
 })

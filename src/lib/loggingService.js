@@ -3,124 +3,13 @@
  * 基于 sessionId 和 cId 追踪用户行为
  */
 
-import { supabase } from './supabase';
 import { getOrCreateSessionId, getDeviceInfo } from './sessionManager';
-
-// 缓存 user_id，避免重复查询
-let cachedUserId = null;
-let cachedSessionId = null;
-
-/**
- * 获取客户端 IP（通过第三方服务）
- * @returns {Promise<string|null>} IP地址
- */
-async function getClientIP() {
-    try {
-        const response = await fetch('https://api.ipify.org?format=json', { timeout: 3000 });
-        const data = await response.json();
-        return data.ip;
-    } catch (e) {
-        console.warn('Failed to get IP address:', e);
-        return null;
-    }
-}
-
-/**
- * 获取或创建用户记录
- * @param {string} cId - Customer/Magnet ID
- * @returns {Promise<number|null>} user_id
- */
-/**
- * 获取或创建用户记录
- * @param {string} cId - Customer/Magnet ID
- * @returns {Promise<number|null>} user_id
- */
-async function getOrCreateUser(cId) {
-    const sessionId = getOrCreateSessionId();
-
-    // 如果缓存的 sessionId 和当前一致，直接返回缓存的 userId
-    if (cachedUserId && cachedSessionId === sessionId) {
-        // 更新访问信息（异步，不等待）
-        supabase
-            .from('user')
-            .update({
-                last_access_at: new Date().toISOString(),
-            })
-            .eq('id', cachedUserId)
-            .then(({ error }) => {
-                if (error) console.error('Failed to update user access:', error);
-            });
-
-        return cachedUserId;
-    }
-
-    try {
-        // 先查询是否存在
-        const { data: existingUser, error: queryError } = await supabase
-            .from('user')
-            .select('id')
-            .eq('session_id', sessionId)
-            .maybeSingle();
-
-        if (queryError) {
-            console.error('Failed to query user:', queryError);
-            return null;
-        }
-
-        if (existingUser) {
-            cachedUserId = existingUser.id;
-            cachedSessionId = sessionId;
-
-            // 更新访问信息（异步，不等待）
-            supabase
-                .from('user')
-                .update({
-                    last_access_at: new Date().toISOString(),
-                })
-                .eq('id', existingUser.id)
-                .then(({ error }) => {
-                    if (error) console.error('Failed to update user access:', error);
-                });
-
-            return existingUser.id;
-        }
-
-        // 创建新用户
-        const deviceInfo = getDeviceInfo();
-        const ipAddress = await getClientIP();
-
-        const { data: newUser, error: insertError } = await supabase
-            .from('user')
-            .insert({
-                session_id: sessionId,
-                // magnet_id removed as it doesn't exist in user table
-                device_info: JSON.stringify(deviceInfo),
-                ip_address: ipAddress,
-                user_agent: navigator.userAgent,
-                first_access_at: new Date().toISOString(),
-                last_access_at: new Date().toISOString(),
-                access_count: 1,
-            })
-            .select('id')
-            .single();
-
-        if (insertError) {
-            console.error('Failed to create user:', insertError);
-            return null;
-        }
-
-        if (newUser) {
-            cachedUserId = newUser.id;
-            cachedSessionId = sessionId;
-            return newUser.id;
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Error in getOrCreateUser:', error);
-        return null;
-    }
-}
+import {
+    apiLogUserAction,
+    apiLogChatMessage,
+    apiCreatePlayLog,
+    apiUpdatePlayLog,
+} from '../api/backendClient.js';
 
 /**
  * 记录用户行为日志
@@ -146,34 +35,18 @@ export async function logUserAction({
             return;
         }
 
-        const userId = await getOrCreateUser(cId);
-        if (!userId) {
-            console.error('Failed to get user_id for logging');
-            return;
-        }
-
         const sessionId = getOrCreateSessionId();
         const deviceInfo = getDeviceInfo();
 
-        // 异步插入日志，不等待结果
-        supabase
-            .from('user_action_log')
-            .insert({
-                user_id: userId,
-                magnet_id: cId, // Correct column name
-                action_type: actionType,
-                magnet_config_qa_id: magnetConfigQaId,
-                device_info: JSON.stringify(deviceInfo),
-                ip_address: null, // Let backend handle or getClientIP if needed (skipped for perf)
-                // Removed fields not in schema: session_id, conversation_id, question_text, context, user_agent
-            })
-            .then(({ error }) => {
-                if (error) {
-                    console.error('Failed to log user action:', error);
-                } else {
-                    console.log(`[LOG] Action: ${actionType}`, { cId, sessionId });
-                }
-            });
+        await apiLogUserAction({
+            cId,
+            actionType,
+            magnetConfigQaId,
+            sessionId,
+            deviceInfo,
+        });
+
+        console.log(`[LOG] Action: ${actionType}`, { cId, sessionId });
     } catch (error) {
         console.error('Error in logUserAction:', error);
     }
@@ -205,29 +78,22 @@ export async function logChatMessage({
             return;
         }
 
-        const userId = await getOrCreateUser(cId);
-        if (!userId) {
-            console.error('Failed to get user_id for chat logging');
-            return;
-        }
+        const sessionId = getOrCreateSessionId();
+        const deviceInfo = getDeviceInfo();
 
-        // 异步插入日志，不等待结果
-        supabase
-            .from('user_chat_log')
-            .insert({
-                user_id: userId,
-                magnet_id: cId, // TYPO in DB Schema: magnet_id
-                question: question,
-                answer: answer,
-                // Removed fields not in schema: conversation_id, session_id, magnet_config_qa_id, answer_method, response_time_ms
-            })
-            .then(({ error }) => {
-                if (error) {
-                    console.error('Failed to log chat message:', error);
-                } else {
-                    console.log(`[LOG] Chat:`, { question: question.substring(0, 30) + '...' });
-                }
-            });
+        await apiLogChatMessage({
+            cId,
+            conversationId,
+            question,
+            answer,
+            answerMethod,
+            magnetConfigQaId,
+            responseTimeMs,
+            sessionId,
+            deviceInfo,
+        });
+
+        console.log(`[LOG] Chat:`, { question: question.substring(0, 30) + '...' });
     } catch (error) {
         console.error('Error in logChatMessage:', error);
     }
@@ -252,35 +118,22 @@ export async function createPlayContentLog({
             return null;
         }
 
-        const userId = await getOrCreateUser(cId);
-        if (!userId) {
-            console.error('Failed to get user_id for play logging');
-            return null;
+        const sessionId = getOrCreateSessionId();
+        const deviceInfo = getDeviceInfo();
+
+        const id = await apiCreatePlayLog({
+            cId,
+            playContentId,
+            magnetConfigQaId,
+            sessionId,
+            deviceInfo,
+        });
+
+        if (id) {
+            console.log(`[LOG] Play started`);
         }
 
-        const startTime = new Date().toISOString();
-
-        const { data, error } = await supabase
-            .from('play_content_log')
-            .insert({
-                user_id: userId,
-                magnet_id: cId, // TYPO in DB Schema: magnet_id
-                megnet_config_qa_id: magnetConfigQaId,
-                play_time: startTime,
-                start_time: startTime,
-                duration: 0,
-                // Removed fields not in schema: play_content_id, session_id
-            })
-            .select('id')
-            .single();
-
-        if (error) {
-            console.error('Failed to create play content log:', error);
-            return null;
-        }
-
-        console.log(`[LOG] Play started`);
-        return data?.id || null;
+        return id;
     } catch (error) {
         console.error('Error in createPlayContentLog:', error);
         return null;
@@ -301,24 +154,16 @@ export async function updatePlayContentLog(logId, { duration, totalDuration = nu
             return;
         }
 
-        const endTime = new Date().toISOString();
+        if (typeof duration !== 'number') {
+            console.warn('duration (number) is required for updating play log');
+            return;
+        }
 
-        // 异步更新日志，不等待结果
-        supabase
-            .from('play_content_log')
-            .update({
-                end_time: endTime,
-                duration: duration,
-                // Removed fields not in schema: total_duration, completion_rate
-            })
-            .eq('id', logId)
-            .then(({ error }) => {
-                if (error) {
-                    console.error('Failed to update play content log:', error);
-                } else {
-                    console.log(`[LOG] Play updated:`, { duration });
-                }
-            });
+        const success = await apiUpdatePlayLog(logId, { duration });
+
+        if (success) {
+            console.log(`[LOG] Play updated:`, { duration });
+        }
     } catch (error) {
         console.error('Error in updatePlayContentLog:', error);
     }

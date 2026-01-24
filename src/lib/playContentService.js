@@ -1,4 +1,7 @@
-import { supabase } from './supabase'
+import {
+    apiGetTodayPlayContent,
+    apiMarkPlayContentAsPlayed,
+} from '../api/backendClient.js'
 
 /**
  * 获取今日播放内容
@@ -11,42 +14,9 @@ import { supabase } from './supabase'
  */
 export async function getTodayPlayContent(customerId = null) {
     try {
-        // 获取今天的日期（YYYY-MM-DD格式）
-        const today = new Date().toISOString().split('T')[0]
-
-        // 构建查询条件 - 先查询当天的内容
-        // 只选择需要的字段：title, id, audio_url
-        let query = supabase
-            .from('play_contents')
-            .select('id, title, audio_url')
-            .eq('scheduled_date', today)
-            .order('created_at', { ascending: false })
-            .limit(1)
-
-        // 如果提供了 customerId，则查询特定客户的内容
-        // 否则查询全局内容（customer_id 为 null）
-        if (customerId) {
-            query = query.eq('customer_id', customerId)
-        } else {
-            query = query.is('customer_id', null)
-        }
-
-        const { data, error } = await query
-
-        if (error) {
-            console.error('查询今日播放内容失败:', error)
-            throw error
-        }
-
-        // 如果找到今日内容，直接返回
-        if (data && data.length > 0) {
-            console.log('找到今日播放内容:', data[0])
-            return data[0]
-        }
-
-        // 如果没有今日内容，获取最新的播放内容作为fallback
-        console.log('今日无排期内容，获取最新内容...')
-        return await getLatestPlayContent(customerId)
+        // 通过后端 API 获取今日播放内容（后端内部包含 fallback 逻辑）
+        const content = await apiGetTodayPlayContent(customerId)
+        return content
 
     } catch (error) {
         console.error('获取播放内容时发生错误:', error)
@@ -62,33 +32,9 @@ export async function getTodayPlayContent(customerId = null) {
  */
 export async function getLatestPlayContent(customerId = null) {
     try {
-        // 只选择需要的字段：title, id, audio_url
-        let query = supabase
-            .from('play_contents')
-            .select('id, title, audio_url')
-            .order('scheduled_date', { ascending: false })
-            .order('created_at', { ascending: false })
-            .limit(1)
-
-        if (customerId) {
-            query = query.eq('customer_id', customerId)
-        } else {
-            query = query.is('customer_id', null)
-        }
-
-        const { data, error } = await query
-
-        if (error) {
-            console.error('查询最新播放内容失败:', error)
-            throw error
-        }
-
-        if (data && data.length > 0) {
-            console.log('找到最新播放内容:', data[0])
-            return data[0]
-        }
-
-        return null
+        // 后端已实现 fallback 逻辑，这里复用同一个接口
+        const content = await apiGetTodayPlayContent(customerId)
+        return content
 
     } catch (error) {
         console.error('获取最新播放内容时发生错误:', error)
@@ -104,17 +50,7 @@ export async function getLatestPlayContent(customerId = null) {
  */
 export async function markAsPlayed(contentId) {
     try {
-        const { error } = await supabase
-            .from('play_contents')
-            .update({ has_played: true, is_playing: false })
-            .eq('id', contentId)
-
-        if (error) {
-            console.error('标记已播放失败:', error)
-            return false
-        }
-
-        return true
+        return await apiMarkPlayContentAsPlayed(contentId)
     } catch (error) {
         console.error('标记已播放时发生错误:', error)
         return false

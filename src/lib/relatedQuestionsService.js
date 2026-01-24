@@ -1,14 +1,14 @@
 /**
  * Related Questions API Service (接口A)
  * 获取推荐问题列表
+ *
+ * 前端只调用本地 /api/related-questions，由后端代理真实的 Dify 接口。
  */
 
-import { env } from '../config/env.js';
-import { supabase } from './supabase.js';
+import { apiGetMagnetStage } from '../api/backendClient.js';
 
-// 从环境变量中读取配置，不在前端代码中硬编码 URL 或 Token
-const API_URL = env.RELATED_QUESTIONS_API_URL;
-const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN;
+// 本地后端代理地址
+const API_URL = '/api/related-questions';
 
 /**
  * 获取推荐问题列表
@@ -18,29 +18,13 @@ const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN;
  */
 export async function getRelatedQuestions(cId, conversationId = '') {
   try {
-    // 如果配置缺失，直接返回空数组，避免在前端暴露默认 URL/Token
-    if (!API_URL || !API_TOKEN) {
-      console.error('Related Questions API configuration is missing. Please check your environment variables.');
-      return [];
-    }
-
     let stage = '';
 
     if (!cId) {
       console.warn('Customer ID (cId) 未提供，使用空字符串');
     } else {
       try {
-        const { data, error } = await supabase
-          .from('magnet')
-          .select('stage')
-          .eq('id', cId)
-          .single();
-
-        if (error) {
-          console.warn('获取 stage 失败:', error);
-        } else if (data) {
-          stage = data.stage;
-        }
+        stage = await apiGetMagnetStage(cId);
       } catch (err) {
         console.warn('查询 magnet 表异常:', err);
       }
@@ -49,7 +33,6 @@ export async function getRelatedQuestions(cId, conversationId = '') {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

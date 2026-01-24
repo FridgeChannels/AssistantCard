@@ -1,13 +1,12 @@
 /**
  * Document Summary API Service (接口B)
  * 获取文档总结内容，用于发送Email或短信
+ *
+ * 前端只调用本地 /api/document-summary，由后端代理真实的 Dify 接口。
  */
 
-import { env } from '../config/env.js';
-
-// 从环境变量中读取配置，不在前端代码中硬编码 URL 或 Token
-const API_URL = env.DOCUMENT_SUMMARY_API_URL;
-const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN;
+// 本地后端代理地址
+const API_URL = '/api/document-summary';
 
 /**
  * 获取文档总结内容
@@ -18,14 +17,6 @@ const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN;
  */
 export async function getDocumentSummary(query, agentName, cId) {
   try {
-    // 如果配置缺失，直接返回空结果，避免在前端暴露默认 URL/Token
-    if (!API_URL || !API_TOKEN) {
-      console.error('Document Summary API configuration is missing. Please check your environment variables.');
-      return {
-        email: '',
-        message: ''
-      };
-    }
     if (!query) {
       console.warn('查询内容为空');
       return {
@@ -45,7 +36,6 @@ export async function getDocumentSummary(query, agentName, cId) {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
