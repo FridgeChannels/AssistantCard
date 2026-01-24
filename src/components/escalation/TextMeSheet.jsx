@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, Phone, Loader2 } from 'lucide-react';
+import { MessageSquare, Phone, Loader2 } from 'lucide-react';
 import { getDocumentSummary } from '../../lib/documentSummaryService';
 import { logUserAction } from '../../lib/loggingService';
 
@@ -144,28 +144,17 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                         animate={{ y: 0 }}
                         exit={{ y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed bottom-0 left-0 right-0 bg-white/70 backdrop-blur-[30px] border-t border-white/20 rounded-t-[32px] z-50 p-6 pb-10 max-w-md mx-auto shadow-[0_-10px_40px_rgba(0,0,0,0.05)] ring-1 ring-white/40"
+                        className="fixed bottom-0 left-0 right-0 h-fit bg-white/70 backdrop-blur-[30px] border-t border-white/20 rounded-t-[32px] z-50 p-6 pb-10 max-w-md mx-auto shadow-[0_-10px_40px_rgba(0,0,0,0.05)] ring-1 ring-white/40"
                     >
                         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
 
-                        <div className="flex items-start justify-between mb-6">
-                            <div>
-                                <h3 className="text-xl font-bold text-sothebys-navy mb-1">Contact {agentName}</h3>
-                                <p className="text-sm text-gray-500">Fastest way to get clarity on this.</p>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 bg-white/60 backdrop-blur-[20px] border border-white/40 rounded-[30px] hover:bg-white/80 transition-colors"
-                            >
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-
                         <div className="space-y-4">
-                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                <span className="text-xs font-semibold text-gray-400 uppercase">Context</span>
-                                <p className="text-gray-700 text-sm mt-1 line-clamp-2">
-                                    {context || "Asking about closing costs and timeline..."}
+                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 min-h-[3rem] w-full">
+                                <span className="text-xs font-semibold text-gray-400 uppercase">Message</span>
+                                <p className="text-gray-700 text-sm mt-1 whitespace-pre-wrap break-words">
+                                    {isLoadingSummary
+                                        ? 'Generating message...'
+                                        : replacePlaceholder(documentSummary.message) || context || '—'}
                                 </p>
                             </div>
 
@@ -173,21 +162,21 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                                 <button
                                     onClick={handleSendSMS}
                                     disabled={!phone || (isLoadingSummary && pendingAction === 'sms')}
-                                    className="flex flex-col items-center justify-center p-4 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-sothebys-navy/90 backdrop-blur-[20px] text-white rounded-[30px] shadow-lg hover:bg-sothebys-navy hover:scale-[1.02] active:scale-95 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isLoadingSummary && pendingAction === 'sms' ? (
-                                        <Loader2 className="w-6 h-6 mb-2 animate-spin" />
+                                        <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
                                     ) : (
-                                        <MessageSquare className="w-6 h-6 mb-2" />
+                                        <MessageSquare className="w-5 h-5 shrink-0" />
                                     )}
                                     <span className="font-medium">Text {agentName}</span>
                                 </button>
                                 <button
                                     onClick={handleCallNow}
                                     disabled={!phone}
-                                    className="flex flex-col items-center justify-center p-4 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-[20px] border border-white/40 text-sothebys-navy rounded-[30px] hover:bg-white/90 hover:border-white/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Phone className="w-6 h-6 mb-2" />
+                                    <Phone className="w-5 h-5 shrink-0" />
                                     <span className="font-medium">Call Now</span>
                                 </button>
                             </div>

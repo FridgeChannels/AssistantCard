@@ -64,7 +64,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                         </div>
                     </div>
 
-                    {/* Text James Button - Show if answerMethod indicates guide/direct and answer is complete */}
+                    {/* Contact James Button - Show if answerMethod indicates guide/direct and answer is complete */}
                     {answer.type !== 'loading' && answer.answerMethod && (answer.answerMethod === 'guide') && (
                         <motion.div
                             initial={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -112,7 +112,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                                         className={`${answer.answerMethod === 'direct' ? 'flex-1' : ''} flex items-center justify-center gap-2 px-5 py-3 bg-green-400 text-white rounded-[30px] font-semibold text-sm shadow-[0_4px_12px_rgba(74,222,128,0.3)] hover:bg-green-500 transition-all`}
                                     >
                                         <MessageSquare className="w-4 h-4" />
-                                        <span>Text {agentName}</span>
+                                        <span>Contact {agentName}</span>
                                     </motion.button>
                                 )}
                             </div>

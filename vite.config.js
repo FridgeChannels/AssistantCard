@@ -11,6 +11,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     cors: true,
-    allowedHosts: 'all', // 禁用 Host 头验证，允许所有域名访问
+    allowedHosts: [
+      'jess-nonpunctuating-sniffily.ngrok-free.dev'
+    ],
+    hmr: false
   },
 })

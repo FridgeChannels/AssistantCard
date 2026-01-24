@@ -33,7 +33,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
       },
       body: JSON.stringify({
         inputs: {
-          megnet_id: cId,
+          magnet_id: cId,
         },
         query: query,
         response_mode: 'streaming',
@@ -223,7 +223,7 @@ export async function sendChatMessageStream(
       },
       body: JSON.stringify({
         inputs: {
-          megnet_id: cId,
+          magnet_id: cId,
         },
         query: query,
         response_mode: 'streaming',
