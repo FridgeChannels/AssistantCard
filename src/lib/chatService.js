@@ -13,9 +13,10 @@ const API_TOKEN = env.CHAT_API_TOKEN;
  * @param {string} query - User's question
  * @param {string} cId - Customer ID (from route parameters)
  * @param {string} conversationId - Conversation ID (optional, for maintaining context)
+ * @param {string} agentName - Agent name (optional, defaults to empty string)
  * @returns {Promise<{answer: string, conversationId: string}>}
  */
-export async function sendChatMessage(query, cId, conversationId = '') {
+export async function sendChatMessage(query, cId, conversationId = '', agentName = '') {
   if (!API_URL || !API_TOKEN) {
     throw new Error('Chat API configuration is missing. Please check your .env file.');
   }
@@ -34,6 +35,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
       body: JSON.stringify({
         inputs: {
           magnet_id: cId,
+          agent_name: agentName || '',
         },
         query: query,
         response_mode: 'streaming',
@@ -193,6 +195,7 @@ export async function sendChatMessage(query, cId, conversationId = '') {
  * @param {Function} onChunk - Callback when a data chunk is received (chunk: string) => void
  * @param {Function} onComplete - Callback when complete (answer: string, conversationId: string, answerMethod?: string) => void
  * @param {Function} onError - Callback on error (error: Error) => void
+ * @param {string} agentName - Agent name (optional, defaults to empty string)
  */
 export async function sendChatMessageStream(
   query,
@@ -200,7 +203,8 @@ export async function sendChatMessageStream(
   conversationId = '',
   onChunk,
   onComplete,
-  onError
+  onError,
+  agentName = ''
 ) {
   if (!API_URL || !API_TOKEN) {
     const error = new Error('Chat API configuration is missing. Please check your .env file.');
@@ -224,6 +228,7 @@ export async function sendChatMessageStream(
       body: JSON.stringify({
         inputs: {
           magnet_id: cId,
+          agent_name: agentName || '',
         },
         query: query,
         response_mode: 'streaming',
