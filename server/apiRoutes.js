@@ -102,11 +102,20 @@ export function registerApiRoutes(app, supabase) {
     const payload = req.body || {};
 
     try {
+      const requestStart = Date.now();
+      let firstChunkAt = null;
+      if (process.env.STREAM_DEBUG === '1') {
+        console.log('[chat-stream] request start', new Date(requestStart).toISOString());
+      }
       const upstreamResponse = await fetch(CHAT_API_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${CHAT_API_TOKEN}`,
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Accept-Encoding': 'identity',
         },
         body: JSON.stringify(payload),
       });
@@ -118,16 +127,44 @@ export function registerApiRoutes(app, supabase) {
       }
 
       // 将上游的流式响应原样透传给前端（保持 SSE / streaming 行为）
-      const contentType = upstreamResponse.headers.get('content-type') || 'text/event-stream';
+      const contentType =
+        upstreamResponse.headers.get('content-type') || 'text/event-stream; charset=utf-8';
       res.status(upstreamResponse.status);
       res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+      }
 
       if (!upstreamResponse.body) {
         return res.end();
       }
 
       const nodeStream = Readable.fromWeb(upstreamResponse.body);
-      nodeStream.pipe(res);
+      nodeStream.on('data', (chunk) => {
+        if (firstChunkAt === null) {
+          firstChunkAt = Date.now();
+          if (process.env.STREAM_DEBUG === '1') {
+            console.log('[chat-stream] first chunk after', firstChunkAt - requestStart, 'ms');
+          }
+        }
+        res.write(chunk);
+        if (process.env.STREAM_DEBUG === '1') {
+          console.log('[chat-stream] chunk', chunk.length, 'bytes', new Date().toISOString());
+        }
+      });
+      nodeStream.on('end', () => {
+        if (process.env.STREAM_DEBUG === '1') {
+          console.log('[chat-stream] stream end after', Date.now() - requestStart, 'ms');
+        }
+        res.end();
+      });
+      nodeStream.on('error', (streamError) => {
+        console.error('Upstream Chat stream error:', streamError);
+        res.end();
+      });
     } catch (error) {
       console.error('Proxy Chat API failed:', error);
       return res.status(500).json({ error: 'Failed to call Chat API' });

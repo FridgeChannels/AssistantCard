@@ -58,8 +58,28 @@ function App({ cId = '' }) {
   const messagesEndRef = useRef(null);
   const answerStartRef = useRef(null); // 用于定位答案开始位置
   const prevChatHistoryLengthRef = useRef(0); // 记录上一次的 chatHistory 长度
-  const streamBufferRef = useRef('');
-  const streamFlushScheduledRef = useRef(false);
+  const streamQueueRef = useRef('');
+  const streamTimerRef = useRef(null);
+  const stopStreamTimer = () => {
+    if (streamTimerRef.current) {
+      clearInterval(streamTimerRef.current);
+      streamTimerRef.current = null;
+    }
+  };
+  const startStreamTimer = () => {
+    if (streamTimerRef.current) return;
+    streamTimerRef.current = setInterval(() => {
+      const pending = streamQueueRef.current;
+      if (!pending) {
+        stopStreamTimer();
+        return;
+      }
+      const sliceSize = Math.min(Math.max(6, Math.ceil(pending.length / 60)), 64);
+      const slice = pending.slice(0, sliceSize);
+      streamQueueRef.current = pending.slice(sliceSize);
+      setCurrentAnswer(prev => prev + slice);
+    }, 30);
+  };
 
   // Reset state when role changes or cId changes
   useEffect(() => {
@@ -112,6 +132,12 @@ function App({ cId = '' }) {
       pageTimeTracker.startTracking(page, cId);
     }
   }, [page, cId]);
+
+  useEffect(() => {
+    return () => {
+      stopStreamTimer();
+    };
+  }, []);
 
   const handleRoleSelect = (role) => {
     setUserRole(role);
@@ -209,25 +235,15 @@ function App({ cId = '' }) {
       conversationId,
       // onChunk: 接收到数据块时更新当前答案（纯文本格式）
       (chunk) => {
-        // 缓冲分段，避免每个 chunk 都触发重渲染
-        streamBufferRef.current += chunk;
-        if (!streamFlushScheduledRef.current) {
-          streamFlushScheduledRef.current = true;
-          requestAnimationFrame(() => {
-            streamFlushScheduledRef.current = false;
-            if (!streamBufferRef.current) return;
-            const pending = streamBufferRef.current;
-            streamBufferRef.current = '';
-            setCurrentAnswer(prev => prev + pending);
-          });
-        }
+        streamQueueRef.current += chunk;
+        startStreamTimer();
       },
       // onComplete: 完成时保存最终答案和 conversation_id
       (finalAnswer, newConversationId, answerMethodFromAPI) => {
         setConversationId(newConversationId);
         setIsTyping(false);
-        streamBufferRef.current = '';
-        streamFlushScheduledRef.current = false;
+        streamQueueRef.current = '';
+        stopStreamTimer();
 
         // 计算响应时间
         const responseTime = Date.now() - startTime;
@@ -311,8 +327,8 @@ function App({ cId = '' }) {
       (error) => {
         console.error('Chat API 调用失败:', error);
         setIsTyping(false);
-        streamBufferRef.current = '';
-        streamFlushScheduledRef.current = false;
+        streamQueueRef.current = '';
+        stopStreamTimer();
         setCurrentAnswer('');
 
         // 获取错误消息

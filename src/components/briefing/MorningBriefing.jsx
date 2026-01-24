@@ -324,49 +324,65 @@ export function MorningBriefing({
                                             </linearGradient>
                                         </defs>
                                         {/* Upper Wave */}
-                                        <motion.path
-                                            d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
-                                            fill="none"
-                                            stroke="#010101"
-                                            strokeWidth="0"
-                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                            animate={isPlaying ? {
-                                                d: [
-                                                    "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
-                                                    "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
-                                                    "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                ]
-                                            } : {
-                                                d: "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                            }}
-                                            transition={{
-                                                duration: 1.5,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                        />
+                                        {isPlaying ? (
+                                            <motion.path
+                                                d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.9 }}
+                                                animate={{
+                                                    d: [
+                                                        "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
+                                                        "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
+                                                        "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                    ]
+                                                }}
+                                                transition={{
+                                                    duration: 1.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut"
+                                                }}
+                                            />
+                                        ) : (
+                                            <path
+                                                d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.9 }}
+                                            />
+                                        )}
                                         {/* Lower Wave (Mirrored) */}
-                                        <motion.path
-                                            d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
-                                            fill="none"
-                                            stroke="#010101"
-                                            strokeWidth="0"
-                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                            animate={isPlaying ? {
-                                                d: [
-                                                    "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
-                                                    "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
-                                                    "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                ]
-                                            } : {
-                                                d: "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                            }}
-                                            transition={{
-                                                duration: 1.5,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                        />
+                                        {isPlaying ? (
+                                            <motion.path
+                                                d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.4 }}
+                                                animate={{
+                                                    d: [
+                                                        "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
+                                                        "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
+                                                        "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                    ]
+                                                }}
+                                                transition={{
+                                                    duration: 1.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut"
+                                                }}
+                                            />
+                                        ) : (
+                                            <path
+                                                d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.4 }}
+                                            />
+                                        )}
                                     </svg>
                                 </div>
 
@@ -387,49 +403,65 @@ export function MorningBriefing({
                                 <div className="h-12 w-24 flex items-center justify-start">
                                     <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
                                         {/* Upper Wave */}
-                                        <motion.path
-                                            d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
-                                            fill="none"
-                                            stroke="#010101"
-                                            strokeWidth="0"
-                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                            animate={isPlaying ? {
-                                                d: [
-                                                    "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
-                                                    "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
-                                                    "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
-                                                ]
-                                            } : {
-                                                d: "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
-                                            }}
-                                            transition={{
-                                                duration: 1.2,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                        />
+                                        {isPlaying ? (
+                                            <motion.path
+                                                d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.9 }}
+                                                animate={{
+                                                    d: [
+                                                        "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
+                                                        "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
+                                                        "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
+                                                    ]
+                                                }}
+                                                transition={{
+                                                    duration: 1.2,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut"
+                                                }}
+                                            />
+                                        ) : (
+                                            <path
+                                                d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.9 }}
+                                            />
+                                        )}
                                         {/* Lower Wave (Mirrored) */}
-                                        <motion.path
-                                            d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
-                                            fill="none"
-                                            stroke="#010101"
-                                            strokeWidth="0"
-                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                            animate={isPlaying ? {
-                                                d: [
-                                                    "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
-                                                    "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
-                                                    "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
-                                                ]
-                                            } : {
-                                                d: "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
-                                            }}
-                                            transition={{
-                                                duration: 1.2,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                        />
+                                        {isPlaying ? (
+                                            <motion.path
+                                                d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.4 }}
+                                                animate={{
+                                                    d: [
+                                                        "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
+                                                        "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
+                                                        "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
+                                                    ]
+                                                }}
+                                                transition={{
+                                                    duration: 1.2,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut"
+                                                }}
+                                            />
+                                        ) : (
+                                            <path
+                                                d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
+                                                fill="none"
+                                                stroke="#010101"
+                                                strokeWidth="0"
+                                                style={{ fill: '#010101', opacity: 0.4 }}
+                                            />
+                                        )}
                                     </svg>
                                 </div>
                             </div>

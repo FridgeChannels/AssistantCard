@@ -127,7 +127,7 @@ export function StarterQuestions({
                         <div className="w-5 h-5 border-2 border-gray-300 border-t-sothebys-navy rounded-full animate-spin"></div>
                     </div>
                 ) : currentQuestions.length > 0 ? (
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="sync">
                         {currentQuestions.map((q, i) => (
                             <motion.button
                                 key={q + i}

@@ -43,6 +43,13 @@ export async function sendChatMessage(query, cId, conversationId = '', agentName
 
     // Check if response is JSON or streaming
     const contentType = response.headers.get('content-type') || '';
+    if (debugStream) {
+      console.log('[stream] response headers', {
+        status: response.status,
+        contentType,
+        hasBody: !!response.body,
+      });
+    }
 
     if (contentType.includes('application/json')) {
       // Non-streaming JSON response
@@ -205,6 +212,12 @@ export async function sendChatMessageStream(
   }
 
   try {
+    const debugStream =
+      typeof window !== 'undefined' &&
+      window.localStorage &&
+      window.localStorage.getItem('stream_debug') === '1';
+    const streamStartAt = Date.now();
+    let lastChunkAt = streamStartAt;
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -232,11 +245,21 @@ export async function sendChatMessageStream(
 
     if (contentType.includes('application/json')) {
       // Non-streaming JSON response (shouldn't happen, but handle it)
+      if (debugStream) {
+        console.log('[stream] non-streaming JSON response');
+      }
       const data = await response.json();
       const answer = data.answer || "I'm sorry, I didn't receive a valid response. Please try again.";
       onChunk?.(answer);
       onComplete?.(answer, data.conversation_id || conversationId, data.answer_method);
       return;
+    }
+
+    if (!response.body) {
+      if (debugStream) {
+        console.log('[stream] missing response body');
+      }
+      throw new Error('Chat API response body is empty.');
     }
 
     // Process streaming response (plain text format)
@@ -246,6 +269,20 @@ export async function sendChatMessageStream(
     let fullAnswer = '';
     let newConversationId = conversationId;
     let extractedAnswerMethod = null; // Track answer_method from stream
+    const appendAnswerChunk = (text) => {
+      if (!text) return;
+      const normalized = String(text);
+      if (normalized.startsWith(fullAnswer)) {
+        const delta = normalized.slice(fullAnswer.length);
+        if (delta) {
+          fullAnswer += delta;
+          onChunk?.(delta);
+        }
+      } else {
+        fullAnswer += normalized;
+        onChunk?.(normalized);
+      }
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -253,10 +290,19 @@ export async function sendChatMessageStream(
       if (done) {
         // Process any remaining buffer as plain text
         if (buffer.trim()) {
-          fullAnswer += buffer.trim();
-          onChunk?.(buffer.trim());
+          appendAnswerChunk(buffer.trim());
         }
         break;
+      }
+
+      if (debugStream) {
+        const now = Date.now();
+        console.log('[stream] chunk received', {
+          bytes: value?.length || 0,
+          msFromStart: now - streamStartAt,
+          msSinceLast: now - lastChunkAt,
+        });
+        lastChunkAt = now;
       }
 
       buffer += decoder.decode(value, { stream: true });
@@ -286,11 +332,8 @@ export async function sendChatMessageStream(
             }
 
             // Extract answer text from message events
-            if (data.event === 'message' && data.answer) {
-              // Append answer chunk to full answer
-              fullAnswer += data.answer;
-              // Send chunk to onChunk callback for real-time updates
-              onChunk?.(data.answer);
+            if (data.answer && (data.event === 'message' || data.event === 'agent_message' || !data.event)) {
+              appendAnswerChunk(data.answer);
             }
 
             // Extract answer_method from JSON if present
@@ -310,8 +353,7 @@ export async function sendChatMessageStream(
           } catch (e) {
             // If not JSON, treat as plain text (fallback)
             console.warn('Failed to parse SSE data as JSON:', e, content);
-            fullAnswer += content;
-            onChunk?.(content);
+            appendAnswerChunk(content);
           }
         } else if (line.trim().startsWith('{')) {
           // Direct JSON format (likely error event)
@@ -330,8 +372,7 @@ export async function sendChatMessageStream(
 
             // Extract answer from direct JSON
             if (data.answer) {
-              fullAnswer += data.answer;
-              onChunk?.(data.answer);
+              appendAnswerChunk(data.answer);
             }
 
             // Extract answer_method from JSON if present
@@ -345,13 +386,11 @@ export async function sendChatMessageStream(
             }
           } catch (e) {
             // Not JSON, treat as plain text
-            fullAnswer += line;
-            onChunk?.(line);
+            appendAnswerChunk(line);
           }
         } else {
           // Plain text line (shouldn't happen, but handle it)
-          fullAnswer += line;
-          onChunk?.(line);
+          appendAnswerChunk(line);
         }
       }
     }
