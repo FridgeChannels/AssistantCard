@@ -37,14 +37,14 @@ CREATE TABLE public.magnet (
   CONSTRAINT magnet_pkey PRIMARY KEY (id),
   CONSTRAINT fk_magnet_tag_magnet FOREIGN KEY (id) REFERENCES public.magnet_config(id)
 );
-CREATE TABLE public.magnet_conf_cta (
+CREATE TABLE public.magnet_config_cta (
   id bigint NOT NULL DEFAULT nextval('cta_id_seq'::regclass),
   magnet_config_id bigint NOT NULL,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   phone character varying,
   email character varying,
   name character varying,
-  CONSTRAINT magnet_conf_cta_pkey PRIMARY KEY (id),
+  CONSTRAINT magnet_config_cta_pkey PRIMARY KEY (id),
   CONSTRAINT fk_cta_magnet FOREIGN KEY (magnet_config_id) REFERENCES public.magnet_config(id)
 );
 CREATE TABLE public.magnet_config (
@@ -75,13 +75,13 @@ CREATE TABLE public.magnet_config_qa (
 );
 CREATE TABLE public.no_answer_qa (
   id bigint NOT NULL DEFAULT nextval('no_answer_qa_id_seq'::regclass),
-  megnet_id bigint NOT NULL,
+  magnet_id bigint NOT NULL,
   question text NOT NULL,
   action character varying NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT no_answer_qa_pkey PRIMARY KEY (id),
-  CONSTRAINT no_answer_qa_megnet_id_fkey FOREIGN KEY (megnet_id) REFERENCES public.magnet(id)
+  CONSTRAINT no_answer_qa_magnet_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.magnet(id)
 );
 CREATE TABLE public.order (
   id bigint NOT NULL DEFAULT nextval('order_id_seq'::regclass),
@@ -142,7 +142,7 @@ CREATE TABLE public.payment (
 CREATE TABLE public.play_content_log (
   id bigint NOT NULL DEFAULT nextval('play_content_log_id_seq'::regclass),
   user_id bigint NOT NULL,
-  megnet_id bigint NOT NULL,
+  magnet_id bigint NOT NULL,
   play_time timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   duration integer NOT NULL DEFAULT 0,
   megnet_config_qa_id bigint,
@@ -150,7 +150,7 @@ CREATE TABLE public.play_content_log (
   end_time timestamp without time zone,
   CONSTRAINT play_content_log_pkey PRIMARY KEY (id),
   CONSTRAINT play_content_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(id),
-  CONSTRAINT play_content_log_qa_id_fkey FOREIGN KEY (megnet_id) REFERENCES public.base_qa(id),
+  CONSTRAINT play_content_log_qa_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.base_qa(id),
   CONSTRAINT play_content_log_megnet_config_qa_id_fkey FOREIGN KEY (megnet_config_qa_id) REFERENCES public.magnet_config_qa(id)
 );
 CREATE TABLE public.play_contents (
@@ -169,7 +169,7 @@ CREATE TABLE public.play_contents (
 );
 CREATE TABLE public.usage_request_log (
   id bigint NOT NULL DEFAULT nextval('usage_request_log_id_seq'::regclass),
-  megnet_id bigint NOT NULL,
+  magnet_id bigint NOT NULL,
   workflow_run_id character varying,
   model_name character varying NOT NULL,
   pricing_version character varying,
@@ -188,7 +188,7 @@ CREATE TABLE public.usage_request_log (
   llm_name character varying,
   dify_app_id character varying,
   CONSTRAINT usage_request_log_pkey PRIMARY KEY (id),
-  CONSTRAINT usage_request_log_megnet_id_fkey FOREIGN KEY (megnet_id) REFERENCES public.magnet(id)
+  CONSTRAINT usage_request_log_magnet_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.magnet(id)
 );
 CREATE TABLE public.user (
   id bigint NOT NULL DEFAULT nextval('user_id_seq1'::regclass),
@@ -222,20 +222,20 @@ CREATE TABLE public.user_action_log (
 CREATE TABLE public.user_chat_log (
   id bigint NOT NULL DEFAULT nextval('user_chat_log_id_seq'::regclass),
   user_id bigint NOT NULL,
-  megnet_id bigint NOT NULL,
+  magnet_id bigint NOT NULL,
   question text NOT NULL,
   answer text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT user_chat_log_pkey PRIMARY KEY (id),
   CONSTRAINT user_chat_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(id),
-  CONSTRAINT user_chat_log_megnet_id_fkey FOREIGN KEY (megnet_id) REFERENCES public.base_qa(id)
+  CONSTRAINT user_chat_log_magnet_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.base_qa(id)
 );
 CREATE TABLE public.yes_answer_qa (
   id bigint NOT NULL DEFAULT nextval('no_answer_qa_id_seq'::regclass),
-  megnet_id bigint NOT NULL,
+  magnet_id bigint NOT NULL,
   question text NOT NULL,
   question_time timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT yes_answer_qa_pkey PRIMARY KEY (id),
-  CONSTRAINT yes_answer_qa_megnet_id_fkey FOREIGN KEY (megnet_id) REFERENCES public.magnet(id)
+  CONSTRAINT yes_answer_qa_magnet_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.magnet(id)
 );

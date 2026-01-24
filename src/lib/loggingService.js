@@ -216,7 +216,7 @@ export async function logChatMessage({
             .from('user_chat_log')
             .insert({
                 user_id: userId,
-                megnet_id: cId, // TYPO in DB Schema: megnet_id
+                magnet_id: cId, // TYPO in DB Schema: magnet_id
                 question: question,
                 answer: answer,
                 // Removed fields not in schema: conversation_id, session_id, magnet_config_qa_id, answer_method, response_time_ms
@@ -264,7 +264,7 @@ export async function createPlayContentLog({
             .from('play_content_log')
             .insert({
                 user_id: userId,
-                megnet_id: cId, // TYPO in DB Schema: megnet_id
+                magnet_id: cId, // TYPO in DB Schema: magnet_id
                 megnet_config_qa_id: magnetConfigQaId,
                 play_time: startTime,
                 start_time: startTime,

@@ -5,8 +5,9 @@
 
 import { env } from '../config/env.js';
 
-const API_URL = env.DOCUMENT_SUMMARY_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
-const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN || 'app-4dXrzm4ppdxc0mv87NCyLEoj';
+// 从环境变量中读取配置，不在前端代码中硬编码 URL 或 Token
+const API_URL = env.DOCUMENT_SUMMARY_API_URL;
+const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN;
 
 /**
  * 获取文档总结内容
@@ -17,6 +18,14 @@ const API_TOKEN = env.DOCUMENT_SUMMARY_API_TOKEN || 'app-4dXrzm4ppdxc0mv87NCyLEo
  */
 export async function getDocumentSummary(query, agentName, cId) {
   try {
+    // 如果配置缺失，直接返回空结果，避免在前端暴露默认 URL/Token
+    if (!API_URL || !API_TOKEN) {
+      console.error('Document Summary API configuration is missing. Please check your environment variables.');
+      return {
+        email: '',
+        message: ''
+      };
+    }
     if (!query) {
       console.warn('查询内容为空');
       return {
@@ -42,7 +51,7 @@ export async function getDocumentSummary(query, agentName, cId) {
       body: JSON.stringify({
         inputs: {
           agent_name: agentName,
-          megnet_id: cId,
+          magnet_id: cId,
         },
         query: query,
         response_mode: 'streaming',
