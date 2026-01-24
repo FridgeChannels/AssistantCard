@@ -369,7 +369,9 @@ function App({ cId = '' }) {
           }
           return newHistory;
         });
-      }
+      },
+      // agentName: 代理名称
+      agentInfo.name || 'James'
     );
   };
 
