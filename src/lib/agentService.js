@@ -33,15 +33,15 @@ export async function getAgentInfo(magnetId) {
       return null
     }
 
-    // 再查询magnet_conf_cta表获取联系信息
+    // 再查询 magnet_config_cta 表获取联系信息
     const { data: ctaData, error: ctaError } = await supabase
-      .from('magnet_conf_cta')
+      .from('magnet_config_cta')
       .select('phone, email, name')
       .eq('magnet_config_id', magnetData.magnet_config_id)
       .single()
 
     if (ctaError) {
-      console.error('查询magnet_conf_cta表失败:', ctaError)
+      console.error('查询 magnet_config_cta 表失败:', ctaError)
       return null
     }
 

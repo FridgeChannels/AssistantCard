@@ -192,7 +192,7 @@ This document lists all tables in the `public` schema with complete metadata: 
 
 ---
 
-### **8. magnet_conf_cta (CTA表)**
+### **8. magnet_config_cta (CTA表)**
 
 **Comment:** CTA表，记录冰箱贴对应的联系人信息
 
@@ -246,7 +246,7 @@ This document lists all tables in the `public` schema with complete metadata: 
 **Foreign Keys:**
 
 - `customer_id` → `public.customer.id` (fk_magnet_user)
-- Referenced by: `magnet.magnet_config_id`, `magnet_conf_cta.magnet_config_id`, `order_item.magnet_id`, `user.magnet_config_id`
+- Referenced by: `magnet.magnet_config_id`, `magnet_config_cta.magnet_config_id`, `order_item.magnet_id`, `user.magnet_config_id`
 
 | Column | Type | Nullable | Default | 说明 |
 | --- | --- | --- | --- | --- |
@@ -356,5 +356,5 @@ This document lists all tables in the `public` schema with complete metadata: 
 **Foreign Keys:**
 
 - `user_id` → `public.user.id`
-- `megnet_id` → `public.base_qa.id`
-- `megnet_config_qa_id` → `public.magnet_config_qa.id`
+- `magnet_id` → `public.base_qa.id`
+- `magnet_config_qa_id` → `public.magnet_config_qa.id`

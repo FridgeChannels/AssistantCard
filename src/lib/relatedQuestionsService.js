@@ -6,8 +6,9 @@
 import { env } from '../config/env.js';
 import { supabase } from './supabase.js';
 
-const API_URL = env.RELATED_QUESTIONS_API_URL || 'http://kno.fridgechannels.com/v1/chat-messages';
-const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0cU';
+// 从环境变量中读取配置，不在前端代码中硬编码 URL 或 Token
+const API_URL = env.RELATED_QUESTIONS_API_URL;
+const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN;
 
 /**
  * 获取推荐问题列表
@@ -17,6 +18,12 @@ const API_TOKEN = env.RELATED_QUESTIONS_API_TOKEN || 'app-djjUthOrEQK0XoXWpK0NM0
  */
 export async function getRelatedQuestions(cId, conversationId = '') {
   try {
+    // 如果配置缺失，直接返回空数组，避免在前端暴露默认 URL/Token
+    if (!API_URL || !API_TOKEN) {
+      console.error('Related Questions API configuration is missing. Please check your environment variables.');
+      return [];
+    }
+
     let stage = '';
 
     if (!cId) {
