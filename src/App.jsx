@@ -60,6 +60,7 @@ function App({ cId = '' }) {
   const prevChatHistoryLengthRef = useRef(0); // 记录上一次的 chatHistory 长度
   const streamQueueRef = useRef('');
   const streamTimerRef = useRef(null);
+  const streamPrefixCheckedRef = useRef(false);
   const stopStreamTimer = () => {
     if (streamTimerRef.current) {
       clearInterval(streamTimerRef.current);
@@ -69,10 +70,23 @@ function App({ cId = '' }) {
   const startStreamTimer = () => {
     if (streamTimerRef.current) return;
     streamTimerRef.current = setInterval(() => {
-      const pending = streamQueueRef.current;
+      let pending = streamQueueRef.current;
       if (!pending) {
         stopStreamTimer();
         return;
+      }
+      if (!streamPrefixCheckedRef.current) {
+        const trimmed = pending.trimStart();
+        if (trimmed.startsWith('[')) {
+          const endIdx = trimmed.indexOf(']');
+          if (endIdx === -1) {
+            return;
+          }
+          const rest = trimmed.slice(endIdx + 1).replace(/^\s+/, '');
+          pending = rest;
+          streamQueueRef.current = rest;
+        }
+        streamPrefixCheckedRef.current = true;
       }
       const sliceSize = Math.min(Math.max(6, Math.ceil(pending.length / 60)), 64);
       const slice = pending.slice(0, sliceSize);
@@ -86,6 +100,7 @@ function App({ cId = '' }) {
     setChatHistory([]);
     setConversationId('');
     setCurrentAnswer('');
+    streamPrefixCheckedRef.current = false;
     setStarterQuestions([]); // 重置推荐问题
     hasPreloadedQuestionsRef.current = false; // 重置懒加载标记
     playContentCacheRef.current = null; // 重置播放内容缓存（cId变化时需要重新加载）
@@ -203,6 +218,7 @@ function App({ cId = '' }) {
     setChatHistory(prev => [...prev, { question: query, answer: tempAnswer }]);
     setIsTyping(true);
     setCurrentAnswer('');
+    streamPrefixCheckedRef.current = false;
 
     // 立即开始获取推荐问题（接口A）- 在回答渲染时就开始请求
     getRelatedQuestions(cId, conversationId).then(questions => {
@@ -244,6 +260,7 @@ function App({ cId = '' }) {
         setIsTyping(false);
         streamQueueRef.current = '';
         stopStreamTimer();
+        streamPrefixCheckedRef.current = false;
 
         // 计算响应时间
         const responseTime = Date.now() - startTime;
@@ -330,6 +347,7 @@ function App({ cId = '' }) {
         streamQueueRef.current = '';
         stopStreamTimer();
         setCurrentAnswer('');
+        streamPrefixCheckedRef.current = false;
 
         // 获取错误消息
         const errorMessage = error.message || 'Sorry, an error occurred while sending the message. Please try again.';
