@@ -20,7 +20,8 @@ export function Backdrop({
   className = '',
 }) {
   // 确保参数在有效范围内
-  const clampedBlurRadius = Math.max(40, Math.min(70, blurRadius));
+  /* Allow 0 blur for clear background */
+  const clampedBlurRadius = Math.max(0, Math.min(70, blurRadius));
   const clampedScale = Math.max(1.0, Math.min(1.2, scale));
   const clampedDarkOverlay = Math.max(0.0, Math.min(0.8, darkOverlayOpacity));
 

@@ -9,12 +9,8 @@ export function MobileContainer({ children, className, backdropImage = null }) {
             className
         )} style={{ minHeight: '100dvh' }}>
             {/* Backdrop 背景层 */}
-            <Backdrop
-                image={backdropImage}
-                darkOverlayOpacity={0}
-                blurRadius={20}
-                vignetteEnabled={false}
-            />
+            {/* Backdrop 背景层 - 移除全屏背景图，只保留背景色 */}
+            <div className="fixed inset-0 bg-gray-200 -z-10" />
 
             {/* 主容器 - 使用 Glass 效果 */}
             <div
@@ -22,15 +18,23 @@ export function MobileContainer({ children, className, backdropImage = null }) {
                 style={{
                     minHeight: '100dvh',
                     maxHeight: '100dvh',
-                    // Glass 效果 - 降低 tint 让背景更清晰
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)',
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                    // border: '1px solid rgba(255, 255, 255, 0.12)', // Optional: remove border if desired, but user didn't ask. keeping it subtle
                     border: 'none',
-                    boxShadow: 'none',
+                    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.5)',
                 }}
             >
+                {/* Background Layer with Blur */}
+                <div
+                    className="absolute inset-0 w-full h-full -z-10"
+                    style={{
+                        backgroundImage: backdropImage ? `url(${backdropImage})` : 'none',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        // filter: 'blur(1px)', // Removed blur
+                        // transform: 'scale(1.1)', // Removed scale
+                    }}
+                />
                 {children}
             </div>
         </div>

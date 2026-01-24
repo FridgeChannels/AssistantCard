@@ -17,9 +17,9 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="flex justify-end items-end gap-2"
             >
-                <div className="bg-[#007AFF]/80 backdrop-blur-[12px] border border-white/20 text-white px-5 py-3 rounded-[24px] rounded-br-sm shadow-[0_8px_20px_rgba(0,122,255,0.3)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium relative overflow-hidden">
+                <div className="bg-blue-50/80 backdrop-blur-[12px] border border-blue-100/50 text-[#010101] px-5 py-3 rounded-[24px] rounded-br-sm shadow-[0_8px_20px_rgba(0,122,255,0.15)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium relative overflow-hidden">
                     {/* Inner highlight for glass feel */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent pointer-events-none" />
                     <div className="relative z-10">{question}</div>
                 </div>
             </motion.div>
@@ -45,7 +45,7 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 <div className="flex-1 space-y-3 max-w-[90%]">
                     <Glass variant="card" cornerRadius={24} className="rounded-tl-sm p-6">
                         {/* Main Text - Support Markdown */}
-                        <div className="text-[#1D1D1F] text-[17px] leading-relaxed tracking-normal font-normal">
+                        <div className="text-[#010101] text-[17px] leading-relaxed tracking-normal font-normal">
                             <ReactMarkdown
                                 components={{
                                     p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,

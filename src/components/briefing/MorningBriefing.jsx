@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, Play, Pause, AlertCircle } from 'lucide-react';
+import { Mic, Play, Pause, AlertCircle, MessageCircle } from 'lucide-react';
 import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
@@ -257,8 +257,8 @@ export function MorningBriefing({
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">S</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">FCAssistant</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">L</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight">Concierge Leo</span>
                 </div>
             </header>
 
@@ -304,91 +304,136 @@ export function MorningBriefing({
                         <Glass variant="panel" className="p-8 flex flex-col justify-between">
                             <div className="flex flex-col items-center">
                                 {/* Date */}
-                                <p className="text-base text-gray-600 text-center mb-4">{dateString}</p>
+                                <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
 
                                 {/* Title - using content from database */}
-                                <h2 className="text-2xl font-bold text-gray-800 text-center mb-8 leading-tight px-4">
+                                <h2 className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4">
                                     {displayTitle}
                                 </h2>
                             </div>
 
                             {/* Audio Player */}
-                            <div className="flex items-center justify-center gap-4 mt-auto">
+                            <div className="flex items-center justify-center gap-6 mt-auto">
                                 {/* Left Waveform */}
-                                <div className="flex items-end gap-1 h-12">
-                                    {[2, 4, 6, 8, 6, 4].map((baseHeight, i) => {
-                                        const minHeight = Math.max(2, baseHeight - 2);
-                                        const maxHeight = Math.min(8, baseHeight + 2);
-                                        return (
-                                            <motion.div
-                                                key={i}
-                                                className="w-1 bg-gray-300 rounded-full"
-                                                animate={isPlaying ? {
-                                                    height: [
-                                                        `${baseHeight * 4}px`,
-                                                        `${maxHeight * 4}px`,
-                                                        `${minHeight * 4}px`,
-                                                        `${baseHeight * 4}px`
-                                                    ],
-                                                } : {
-                                                    height: `${baseHeight * 4}px`
-                                                }}
-                                                transition={{
-                                                    duration: 0.6 + (i % 3) * 0.2,
-                                                    repeat: isPlaying ? Infinity : 0,
-                                                    ease: "easeInOut",
-                                                    delay: i * 0.05
-                                                }}
-                                                style={{ height: `${baseHeight * 4}px` }}
-                                            />
-                                        );
-                                    })}
+                                <div className="h-12 w-24 flex items-center justify-end">
+                                    <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
+                                        <defs>
+                                            <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#010101" stopOpacity="0.8" />
+                                                <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
+                                            </linearGradient>
+                                        </defs>
+                                        {/* Upper Wave */}
+                                        <motion.path
+                                            d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
+                                            fill="none"
+                                            stroke="#010101"
+                                            strokeWidth="0"
+                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                            animate={isPlaying ? {
+                                                d: [
+                                                    "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
+                                                    "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
+                                                    "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                ]
+                                            } : {
+                                                d: "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                            }}
+                                            transition={{
+                                                duration: 1.5,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            }}
+                                        />
+                                        {/* Lower Wave (Mirrored) */}
+                                        <motion.path
+                                            d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
+                                            fill="none"
+                                            stroke="#010101"
+                                            strokeWidth="0"
+                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                            animate={isPlaying ? {
+                                                d: [
+                                                    "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
+                                                    "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
+                                                    "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                ]
+                                            } : {
+                                                d: "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                            }}
+                                            transition={{
+                                                duration: 1.5,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            }}
+                                        />
+                                    </svg>
                                 </div>
 
                                 {/* Play/Pause Button */}
                                 <button
                                     onClick={handlePlay}
                                     disabled={!audioElement}
-                                    className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-gray-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
                                 >
                                     {isPlaying ? (
-                                        <Pause className="w-7 h-7 text-white" fill="white" />
+                                        <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
                                     ) : (
-                                        <Play className="w-7 h-7 text-white ml-0.5" fill="white" />
+                                        <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
                                     )}
                                 </button>
 
                                 {/* Right Waveform */}
-                                <div className="flex items-end gap-1 h-12">
-                                    {[3, 5, 7, 5, 3, 2].map((baseHeight, i) => {
-                                        const minHeight = Math.max(2, baseHeight - 2);
-                                        const maxHeight = Math.min(8, baseHeight + 2);
-                                        return (
-                                            <motion.div
-                                                key={i}
-                                                className="w-1 bg-gray-300 rounded-full"
-                                                animate={isPlaying ? {
-                                                    height: [
-                                                        `${baseHeight * 4}px`,
-                                                        `${maxHeight * 4}px`,
-                                                        `${minHeight * 4}px`,
-                                                        `${baseHeight * 4}px`
-                                                    ],
-                                                } : {
-                                                    height: `${baseHeight * 4}px`
-                                                }}
-                                                transition={{
-                                                    duration: 0.6 + (i % 3) * 0.2,
-                                                    repeat: isPlaying ? Infinity : 0,
-                                                    ease: "easeInOut",
-                                                    delay: (i + 6) * 0.05
-                                                }}
-                                                style={{ height: `${baseHeight * 4}px` }}
-                                            />
-                                        );
-                                    })}
+                                <div className="h-12 w-24 flex items-center justify-start">
+                                    <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
+                                        {/* Upper Wave */}
+                                        <motion.path
+                                            d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
+                                            fill="none"
+                                            stroke="#010101"
+                                            strokeWidth="0"
+                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                            animate={isPlaying ? {
+                                                d: [
+                                                    "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
+                                                    "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
+                                                    "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
+                                                ]
+                                            } : {
+                                                d: "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
+                                            }}
+                                            transition={{
+                                                duration: 1.2,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            }}
+                                        />
+                                        {/* Lower Wave (Mirrored) */}
+                                        <motion.path
+                                            d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
+                                            fill="none"
+                                            stroke="#010101"
+                                            strokeWidth="0"
+                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                            animate={isPlaying ? {
+                                                d: [
+                                                    "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
+                                                    "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
+                                                    "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
+                                                ]
+                                            } : {
+                                                d: "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
+                                            }}
+                                            transition={{
+                                                duration: 1.2,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            }}
+                                        />
+                                    </svg>
                                 </div>
                             </div>
+                            {/* End Audio Player */}
                         </Glass>
                     </motion.div>
                 )}
@@ -405,8 +450,8 @@ export function MorningBriefing({
                             onClick={onTalkToAssistant}
                             className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                         >
-                            <Mic className="w-5 h-5 text-gray-700" />
-                            <span className="text-base font-medium text-gray-800">Talk to Assistant</span>
+                            <MessageCircle className="w-5 h-5 text-[#010101]" />
+                            <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
                         </button>
                     </Glass>
                 </motion.div>

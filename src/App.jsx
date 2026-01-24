@@ -412,7 +412,7 @@ function App({ cId = '' }) {
   };
 
   return (
-    <MobileContainer backdropImage="/bg.png">
+    <MobileContainer backdropImage="/bg2.png">
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
@@ -504,13 +504,13 @@ function App({ cId = '' }) {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={handleBackToBriefing}
-                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/60 backdrop-blur-[20px] transition-colors"
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/20 backdrop-blur-[20px] transition-colors"
                   >
-                    <ArrowLeft className="w-5 h-5 text-gray-900" />
+                    <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
                   </button>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">S</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">FCAssistant</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">L</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Concierge Leo</span>
                   </div>
                 </div>
               </header>

@@ -112,10 +112,10 @@ export function StarterQuestions({
     return (
         <div className="w-full max-w-sm mx-auto px-6">
             <div className="relative flex items-center justify-center mb-4">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Where to start?</span>
+                <span className="text-xs font-bold text-black uppercase tracking-widest">Where to start?</span>
                 <button
                     onClick={handleRefresh}
-                    className="absolute right-0 p-2 text-gray-400 hover:text-sothebys-navy bg-white/20 backdrop-blur-[20px] hover:bg-white/40 rounded-[30px] transition-colors border border-white/40"
+                    className="absolute right-0 p-2 text-gray-500 hover:text-black bg-white/20 backdrop-blur-[20px] hover:bg-white/40 rounded-[30px] transition-colors border border-gray-200/40"
                 >
                     <RefreshCw className="w-4 h-4" />
                 </button>

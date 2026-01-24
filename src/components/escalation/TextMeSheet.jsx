@@ -141,13 +141,13 @@ export function TextMeSheet({ isOpen, onClose, context, guideContent = '', agent
                         className="fixed inset-0 bg-black/5 backdrop-blur-sm z-50"
                     />
                     <motion.div
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[min(320px,calc(100vw-2rem))] h-fit z-50"
+                        initial={{ opacity: 0, scale: 0.9, y: "-50%", x: "-50%" }}
+                        animate={{ opacity: 1, scale: 1, y: "-50%", x: "-50%" }}
+                        exit={{ opacity: 0, scale: 0.9, y: "-50%", x: "-50%" }}
+                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                        className="fixed top-1/2 left-1/2 w-[min(320px,calc(100vw-2rem))] h-fit z-50"
                     >
-                        <Glass variant="panel" className="p-6">
+                        <Glass variant="panel" className="p-6 !bg-white/90 backdrop-blur-xl shadow-2xl">
                             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
 
                             <div className="flex flex-col gap-4">

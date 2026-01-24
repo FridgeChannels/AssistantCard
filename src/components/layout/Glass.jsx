@@ -53,9 +53,9 @@ export function Glass({
 
   // 材质对应的模糊强度
   const materialBlur = {
-    ultraThin: 8,
-    thin: 12,
-    regular: 16,
+    ultraThin: 20,
+    thin: 30,
+    regular: 40,
   };
 
   // 确保参数在有效范围内
@@ -72,8 +72,8 @@ export function Glass({
       )}
       style={{
         borderRadius: `${finalRadius}px`,
-        // 毛玻璃背景效果 + Tint overlay（白玻璃效果）
-        backgroundColor: `rgba(255, 255, 255, ${clampedTintOpacity * 0.5})`,
+        // 毛玻璃背景效果 + Tint overlay（白玻璃效果） - 增加不透明度提升实体感
+        backgroundColor: `rgba(255, 255, 255, ${clampedTintOpacity * 1.2})`,
         backdropFilter: `blur(${materialBlur[material] || materialBlur.ultraThin}px)`,
         WebkitBackdropFilter: `blur(${materialBlur[material] || materialBlur.ultraThin}px)`,
         // 边框
