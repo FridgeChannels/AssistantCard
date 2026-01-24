@@ -58,6 +58,8 @@ function App({ cId = '' }) {
   const messagesEndRef = useRef(null);
   const answerStartRef = useRef(null); // 用于定位答案开始位置
   const prevChatHistoryLengthRef = useRef(0); // 记录上一次的 chatHistory 长度
+  const streamBufferRef = useRef('');
+  const streamFlushScheduledRef = useRef(false);
 
   // Reset state when role changes or cId changes
   useEffect(() => {
@@ -207,59 +209,25 @@ function App({ cId = '' }) {
       conversationId,
       // onChunk: 接收到数据块时更新当前答案（纯文本格式）
       (chunk) => {
-        setCurrentAnswer(prev => {
-          // Append chunk to previous answer (streaming)
-          let accumulatedAnswer = prev + chunk;
-
-          // 检查最后一条消息是否已经有 answerMethod，如果没有则尝试解析
-          setChatHistory(prevHistory => {
-            const newHistory = [...prevHistory];
-            if (newHistory.length > 0) {
-              const currentAnswer = newHistory[newHistory.length - 1].answer || {};
-              const existingAnswerMethod = currentAnswer.answerMethod;
-
-              // 如果还没有提取过 answerMethod，尝试从累积的文本中解析
-              let cleanedAnswer = accumulatedAnswer;
-              let answerMethod = existingAnswerMethod;
-
-              if (!existingAnswerMethod) {
-                const parsed = parseAnswerWithMethod(accumulatedAnswer);
-                if (parsed.answerMethod) {
-                  cleanedAnswer = parsed.text;
-                  answerMethod = parsed.answerMethod;
-                }
-              } else {
-                // 如果已经提取过，确保 [method] 不会出现在文本中
-                const parsed = parseAnswerWithMethod(accumulatedAnswer);
-                if (parsed.answerMethod) {
-                  cleanedAnswer = parsed.text;
-                }
-              }
-
-              // Check if this looks like an error message
-              const isErrorText = cleanedAnswer === "I'm sorry, I didn't receive a valid response. Please try again.";
-
-              newHistory[newHistory.length - 1] = {
-                ...newHistory[newHistory.length - 1],
-                answer: {
-                  ...currentAnswer,
-                  text: cleanedAnswer,
-                  type: isErrorText ? 'error' : (currentAnswer.type || 'result'),
-                  answerMethod: answerMethod || undefined, // 如果有则设置，否则保持 undefined
-                  relatedQuestions: isErrorText ? [] : (currentAnswer.relatedQuestions || []),
-                }
-              };
-            }
-            return newHistory;
+        // 缓冲分段，避免每个 chunk 都触发重渲染
+        streamBufferRef.current += chunk;
+        if (!streamFlushScheduledRef.current) {
+          streamFlushScheduledRef.current = true;
+          requestAnimationFrame(() => {
+            streamFlushScheduledRef.current = false;
+            if (!streamBufferRef.current) return;
+            const pending = streamBufferRef.current;
+            streamBufferRef.current = '';
+            setCurrentAnswer(prev => prev + pending);
           });
-
-          return accumulatedAnswer;
-        });
+        }
       },
       // onComplete: 完成时保存最终答案和 conversation_id
       (finalAnswer, newConversationId, answerMethodFromAPI) => {
         setConversationId(newConversationId);
         setIsTyping(false);
+        streamBufferRef.current = '';
+        streamFlushScheduledRef.current = false;
 
         // 计算响应时间
         const responseTime = Date.now() - startTime;
@@ -343,6 +311,9 @@ function App({ cId = '' }) {
       (error) => {
         console.error('Chat API 调用失败:', error);
         setIsTyping(false);
+        streamBufferRef.current = '';
+        streamFlushScheduledRef.current = false;
+        setCurrentAnswer('');
 
         // 获取错误消息
         const errorMessage = error.message || 'Sorry, an error occurred while sending the message. Please try again.';
@@ -549,11 +520,14 @@ function App({ cId = '' }) {
                 {/* Chat History */}
                 {chatHistory.map((item, index) => {
                   const isLastMessage = index === chatHistory.length - 1;
+                  const displayAnswer = (isLastMessage && isTyping)
+                    ? { ...item.answer, text: currentAnswer || '' }
+                    : item.answer;
                   return (
                     <AnswerCard
                       key={index}
                       question={item.question}
-                      answer={item.answer}
+                      answer={displayAnswer}
                       onQuestionSelect={handleSearch}
                       showRelated={isLastMessage}
                       onTextJames={() => {
