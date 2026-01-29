@@ -333,12 +333,6 @@ export function registerApiRoutes(app, supabase) {
         .eq('id', magnetId)
         .maybeSingle();
 
-      console.log('[CTA] magnet query result:', {
-        magnetId,
-        magnetData,
-        magnetError,
-      });
-
       if (magnetError) {
         console.error('Error querying magnet:', magnetError);
         return res.status(500).json({ error: 'Failed to query magnet' });
@@ -353,13 +347,6 @@ export function registerApiRoutes(app, supabase) {
         .from('magnet_config_cta')
         .select('id, phone, email, name')
         .eq('id', magnetData.magnet_config_cta_id);
-
-      console.log('[CTA] magnet_config_cta query:', {
-        table: 'magnet_config_cta',
-        idFilter: magnetData.magnet_config_cta_id,
-        rowsCount: Array.isArray(ctaRows) ? ctaRows.length : 0,
-        ctaError,
-      });
 
       if (ctaError) {
         console.error('Error querying magnet_config_cta:', ctaError);
@@ -424,6 +411,7 @@ export function registerApiRoutes(app, supabase) {
         .order('created_at', orderOpt)
         .limit(1);
 
+      console.log('[play-contents] latest content:', latest[0]);
       if (latestErr) {
         console.error('Error querying play_news_contents:', latestErr);
         return res.status(500).json({ error: 'Failed to query play_news_contents' });
