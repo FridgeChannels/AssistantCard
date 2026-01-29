@@ -7,8 +7,8 @@ import { cn } from '../../lib/utils';
  * @param {React.ReactNode} children - 子元素
  * @param {string} variant - 预设样式：'card' | 'panel' | 'pill'，默认 'card'
  * @param {number} cornerRadius - 自定义圆角半径（覆盖预设）
- * @param {number} tintOpacity - tint overlay 透明度，默认 0.24（范围 0.18~0.32）
- * @param {string} material - 材质类型：'ultraThin' | 'thin' | 'regular'，默认 'ultraThin'
+ * @param {number} tintOpacity - tint overlay 透明度，默认 0.24（范围 0~0.32；传 0 可做“仅边框”）
+ * @param {string} material - 材质类型：'ultraThin' | 'thin' | 'regular' | 'none'，默认 'ultraThin'
  * @param {number} borderOpacity - 边框透明度，默认 0.12（范围 0.10~0.18）
  * @param {boolean} shadowEnabled - 是否启用阴影，默认 true
  * @param {boolean} highlightEnabled - 是否启用内部高光，默认 true
@@ -24,6 +24,7 @@ export function Glass({
   shadowEnabled = true,
   highlightEnabled = true,
   className = '',
+  ...rest
 }) {
   // 预设圆角
   const presetRadius = {
@@ -56,13 +57,15 @@ export function Glass({
     ultraThin: 20,
     thin: 30,
     regular: 40,
+    none: 0,
   };
 
   // 确保参数在有效范围内
-  const clampedTintOpacity = Math.max(0.18, Math.min(0.32, tintOpacity));
+  const clampedTintOpacity = Math.max(0, Math.min(0.32, tintOpacity));
   const clampedBorderOpacity = Math.max(0.10, Math.min(0.18, borderOpacity));
   const finalRadius = cornerRadius !== null ? cornerRadius : presetRadius[variant] || presetRadius.card;
   const shadow = presetShadow[variant] || presetShadow.card;
+  const blurPx = materialBlur[material] ?? materialBlur.ultraThin;
 
   return (
     <div
@@ -70,14 +73,15 @@ export function Glass({
         'relative',
         className
       )}
+      {...rest}
       style={{
         borderRadius: `${finalRadius}px`,
-        // 毛玻璃背景效果 + Tint overlay（白玻璃效果） - 增加不透明度提升实体感
-        backgroundColor: `rgba(255, 255, 255, ${clampedTintOpacity * 1.2})`,
-        backdropFilter: `blur(${materialBlur[material] || materialBlur.ultraThin}px)`,
-        WebkitBackdropFilter: `blur(${materialBlur[material] || materialBlur.ultraThin}px)`,
+        // 背景（可关闭）+ 毛玻璃 blur（可关闭）
+        backgroundColor: clampedTintOpacity > 0 ? `rgba(255, 255, 255, ${Math.min(0.35, clampedTintOpacity * 1.2)})` : 'transparent',
+        backdropFilter: blurPx > 0 ? `blur(${blurPx}px)` : 'none',
+        WebkitBackdropFilter: blurPx > 0 ? `blur(${blurPx}px)` : 'none',
         // 边框
-        border: `1px solid rgba(255, 255, 255, ${clampedBorderOpacity + 0.1})`,
+        border: `1px solid rgba(255, 255, 255, ${clampedBorderOpacity})`,
         // 阴影
         boxShadow: shadowEnabled
           ? `0 ${shadow.y}px ${shadow.blur}px ${shadow.color}`
@@ -88,7 +92,7 @@ export function Glass({
       }}
     >
       {/* 内部高光（顶部淡白色渐变） */}
-      {highlightEnabled && (
+      {highlightEnabled && clampedTintOpacity > 0 && (
         <div
           className="absolute inset-0 pointer-events-none"
           style={{

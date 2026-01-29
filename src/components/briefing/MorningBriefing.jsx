@@ -5,6 +5,7 @@ import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 import { Glass } from '../layout/Glass';
+import { LocationSelector } from './LocationSelector';
 
 export function MorningBriefing({
     onTalkToAssistant,
@@ -15,7 +16,9 @@ export function MorningBriefing({
     isLoadingPlayContent = false,
     onPlayContentLoaded,
     onPlayContentLoadingChange,
-    onSavePlaybackState
+    onSavePlaybackState,
+    selectedLocation,
+    onLocationSelect
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [playContent, setPlayContent] = useState(cachedPlayContent); // 使用缓存的播放内容
@@ -253,240 +256,248 @@ export function MorningBriefing({
     const displayTitle = playContent?.title || 'Daily Briefing';
 
     return (
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <header className="px-5 py-4 flex items-center justify-between relative z-10">
+            <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">L</div>
                     <span className="font-semibold text-sothebys-navy tracking-tight">Concierge Leo</span>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                {/* Loading State */}
-                {isLoading && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="w-full max-w-md mb-6 min-h-[354px]"
-                    >
-                        <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
-                            <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-800 rounded-full animate-spin mb-4"></div>
-                            <p className="text-gray-600">Loading...</p>
-                        </Glass>
-                    </motion.div>
-                )}
-
-                {/* Error State */}
-                {error && !isLoading && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="w-full max-w-md mb-6 min-h-[354px]"
-                    >
-                        <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
-                            <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
-                            <p className="text-gray-800 font-medium mb-2">Content Coming Soon</p>
-                            <p className="text-gray-600 text-sm text-center">{error}</p>
-                        </Glass>
-                    </motion.div>
-                )}
-
-                {/* Content Card */}
-                {playContent && !isLoading && !error && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                        className="w-full max-w-md mb-6 min-h-[354px]"
-                    >
-                        <Glass variant="panel" className="p-8 flex flex-col justify-between">
-                            <div className="flex flex-col items-center">
-                                {/* Date */}
-                                <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
-
-                                {/* Title - using content from database */}
-                                <h2 className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4">
-                                    {displayTitle}
-                                </h2>
-                            </div>
-
-                            {/* Audio Player */}
-                            <div className="flex items-center justify-center gap-6 mt-auto">
-                                {/* Left Waveform */}
-                                <div className="h-12 w-24 flex items-center justify-end">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
-                                        <defs>
-                                            <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#010101" stopOpacity="0.8" />
-                                                <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
-                                            </linearGradient>
-                                        </defs>
-                                        {/* Upper Wave */}
-                                        {isPlaying ? (
-                                            <motion.path
-                                                d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.9 }}
-                                                animate={{
-                                                    d: [
-                                                        "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
-                                                        "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
-                                                        "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                    ]
-                                                }}
-                                                transition={{
-                                                    duration: 1.5,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut"
-                                                }}
-                                            />
-                                        ) : (
-                                            <path
-                                                d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.9 }}
-                                            />
-                                        )}
-                                        {/* Lower Wave (Mirrored) */}
-                                        {isPlaying ? (
-                                            <motion.path
-                                                d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.4 }}
-                                                animate={{
-                                                    d: [
-                                                        "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
-                                                        "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
-                                                        "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                    ]
-                                                }}
-                                                transition={{
-                                                    duration: 1.5,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut"
-                                                }}
-                                            />
-                                        ) : (
-                                            <path
-                                                d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.4 }}
-                                            />
-                                        )}
-                                    </svg>
-                                </div>
-
-                                {/* Play/Pause Button */}
-                                <button
-                                    onClick={handlePlay}
-                                    disabled={!audioElement}
-                                    className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                                >
-                                    {isPlaying ? (
-                                        <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
-                                    ) : (
-                                        <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
-                                    )}
-                                </button>
-
-                                {/* Right Waveform */}
-                                <div className="h-12 w-24 flex items-center justify-start">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
-                                        {/* Upper Wave */}
-                                        {isPlaying ? (
-                                            <motion.path
-                                                d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.9 }}
-                                                animate={{
-                                                    d: [
-                                                        "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
-                                                        "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
-                                                        "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
-                                                    ]
-                                                }}
-                                                transition={{
-                                                    duration: 1.2,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut"
-                                                }}
-                                            />
-                                        ) : (
-                                            <path
-                                                d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.9 }}
-                                            />
-                                        )}
-                                        {/* Lower Wave (Mirrored) */}
-                                        {isPlaying ? (
-                                            <motion.path
-                                                d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.4 }}
-                                                animate={{
-                                                    d: [
-                                                        "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
-                                                        "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
-                                                        "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
-                                                    ]
-                                                }}
-                                                transition={{
-                                                    duration: 1.2,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut"
-                                                }}
-                                            />
-                                        ) : (
-                                            <path
-                                                d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
-                                                fill="none"
-                                                stroke="#010101"
-                                                strokeWidth="0"
-                                                style={{ fill: '#010101', opacity: 0.4 }}
-                                            />
-                                        )}
-                                    </svg>
-                                </div>
-                            </div>
-                            {/* End Audio Player */}
-                        </Glass>
-                    </motion.div>
-                )}
-
-                {/* Talk to Assistant Button */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="w-full max-w-md"
-                >
-                    <Glass variant="card" className="px-6 py-4">
-                        <button
-                            onClick={onTalkToAssistant}
-                            className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+            {/* Main Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+                <div className="flex flex-col items-center justify-center px-6 pb-24 min-h-full">
+                    {/* Loading State */}
+                    {isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="w-full max-w-md mb-6 min-h-[354px]"
                         >
-                            <MessageCircle className="w-5 h-5 text-[#010101]" />
-                            <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
-                        </button>
-                    </Glass>
-                </motion.div>
+                            <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
+                                <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-800 rounded-full animate-spin mb-4"></div>
+                                <p className="text-gray-600">Loading...</p>
+                            </Glass>
+                        </motion.div>
+                    )}
+
+                    {/* Error State */}
+                    {error && !isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="w-full max-w-md mb-6 min-h-[354px]"
+                        >
+                            <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
+                                <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
+                                <p className="text-gray-800 font-medium mb-2">Content Coming Soon</p>
+                                <p className="text-gray-600 text-sm text-center">{error}</p>
+                            </Glass>
+                        </motion.div>
+                    )}
+
+                    {/* Content Card */}
+                    {playContent && !isLoading && !error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="w-full max-w-md mb-3 min-h-[354px]"
+                        >
+                            <Glass variant="panel" className="p-8 flex flex-col justify-between">
+                                <div className="flex flex-col items-center">
+                                    {/* Date */}
+                                    <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
+
+                                    {/* Title - using content from database */}
+                                    <h2 className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4">
+                                        {displayTitle}
+                                    </h2>
+                                </div>
+
+                                {/* Audio Player */}
+                                <div className="flex items-center justify-center gap-6 mt-auto">
+                                    {/* Left Waveform */}
+                                    <div className="h-12 w-24 flex items-center justify-end">
+                                        <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
+                                            <defs>
+                                                <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#010101" stopOpacity="0.8" />
+                                                    <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
+                                                </linearGradient>
+                                            </defs>
+                                            {/* Upper Wave */}
+                                            {isPlaying ? (
+                                                <motion.path
+                                                    d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.9 }}
+                                                    animate={{
+                                                        d: [
+                                                            "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
+                                                            "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
+                                                            "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                        ]
+                                                    }}
+                                                    transition={{
+                                                        duration: 1.5,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut"
+                                                    }}
+                                                />
+                                            ) : (
+                                                <path
+                                                    d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.9 }}
+                                                />
+                                            )}
+                                            {/* Lower Wave (Mirrored) */}
+                                            {isPlaying ? (
+                                                <motion.path
+                                                    d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.4 }}
+                                                    animate={{
+                                                        d: [
+                                                            "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
+                                                            "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
+                                                            "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                        ]
+                                                    }}
+                                                    transition={{
+                                                        duration: 1.5,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut"
+                                                    }}
+                                                />
+                                            ) : (
+                                                <path
+                                                    d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.4 }}
+                                                />
+                                            )}
+                                        </svg>
+                                    </div>
+
+                                    {/* Play/Pause Button */}
+                                    <button
+                                        onClick={handlePlay}
+                                        disabled={!audioElement}
+                                        className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                                    >
+                                        {isPlaying ? (
+                                            <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
+                                        ) : (
+                                            <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
+                                        )}
+                                    </button>
+
+                                    {/* Right Waveform */}
+                                    <div className="h-12 w-24 flex items-center justify-start">
+                                        <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
+                                            {/* Upper Wave */}
+                                            {isPlaying ? (
+                                                <motion.path
+                                                    d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.9 }}
+                                                    animate={{
+                                                        d: [
+                                                            "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
+                                                            "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
+                                                            "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
+                                                        ]
+                                                    }}
+                                                    transition={{
+                                                        duration: 1.2,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut"
+                                                    }}
+                                                />
+                                            ) : (
+                                                <path
+                                                    d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.9 }}
+                                                />
+                                            )}
+                                            {/* Lower Wave (Mirrored) */}
+                                            {isPlaying ? (
+                                                <motion.path
+                                                    d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.4 }}
+                                                    animate={{
+                                                        d: [
+                                                            "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
+                                                            "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
+                                                            "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
+                                                        ]
+                                                    }}
+                                                    transition={{
+                                                        duration: 1.2,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut"
+                                                    }}
+                                                />
+                                            ) : (
+                                                <path
+                                                    d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
+                                                    fill="none"
+                                                    stroke="#010101"
+                                                    strokeWidth="0"
+                                                    style={{ fill: '#010101', opacity: 0.4 }}
+                                                />
+                                            )}
+                                        </svg>
+                                    </div>
+                                </div>
+                                {/* End Audio Player */}
+                            </Glass>
+                        </motion.div>
+                    )}
+
+                    {/* Location Selector */}
+                    <LocationSelector
+                        selectedLocation={selectedLocation}
+                        onSelect={onLocationSelect}
+                    />
+
+                    {/* Talk to Assistant Button */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className="w-full max-w-md"
+                    >
+                        <Glass variant="card" className="px-6 py-4">
+                            <button
+                                onClick={onTalkToAssistant}
+                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                            >
+                                <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
+                            </button>
+                        </Glass>
+                    </motion.div>
+                </div>
             </div>
         </div>
     );
