@@ -431,6 +431,53 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
+  // 根据 content_play.id 获取记录并解析出 magnetId（供 /tp/:id 页面使用）
+  app.get('/api/content-play/:id', async (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    try {
+      const { data: row, error } = await supabase
+        .from('content_play')
+        .select('id, customer_id, original_content, rss_url, generated_play_text, audio_url, cta_text, cta_link, created_at, updated_at, original_title, display_title, team_name, front_image_url, logo_url, back_image_url, team_image_url')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error querying content_play:', error);
+        return res.status(500).json({ error: 'Failed to query content_play' });
+      }
+
+      if (!row) {
+        return res.status(404).json({ error: 'Content play not found' });
+      }
+
+      let magnetId = null;
+      if (row.customer_id) {
+        const { data: magnets, error: magnetErr } = await supabase
+          .from('magnet')
+          .select('id')
+          .eq('customer_id', row.customer_id)
+          .limit(1);
+        const magnet = Array.isArray(magnets) ? magnets[0] : magnets;
+        if (!magnetErr && magnet?.id != null) {
+          magnetId = String(magnet.id);
+        }
+      }
+
+      return res.json({
+        ...row,
+        magnetId,
+      });
+    } catch (err) {
+      console.error('Unexpected error in /api/content-play/:id', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // 用户行为日志
   app.post('/api/log/user-action', async (req, res) => {
     const { cId, actionType, magnetConfigQaId, sessionId, deviceInfo } = req.body || {};

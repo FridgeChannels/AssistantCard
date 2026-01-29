@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, Play, Pause, AlertCircle, MessageCircle } from 'lucide-react';
+import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon } from 'lucide-react';
 import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
@@ -18,7 +18,11 @@ export function MorningBriefing({
     onPlayContentLoadingChange,
     onSavePlaybackState,
     selectedLocation,
-    onLocationSelect
+    onLocationSelect,
+    hideLocationSelector = false,
+    ctaTextOverride,
+    ctaLink,
+    disableRelatedQuestions = false,
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [playContent, setPlayContent] = useState(cachedPlayContent); // 使用缓存的播放内容
@@ -31,16 +35,24 @@ export function MorningBriefing({
     const playStartTime = useRef(null); // 播放开始时间
     const audioRef = useRef(null); // 用于cleanup中访问audioElement
 
-    const currentDate = new Date();
+    // 日期显示：
+    // - 若播放内容包含 created_at（例如 tp/:id 使用 content_play 表），则用该时间
+    // - 否则回退到当前日期（原有行为）
+    const baseDate = playContent?.created_at ? new Date(playContent.created_at) : new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayName = dayNames[currentDate.getDay()];
-    const monthName = monthNames[currentDate.getMonth()];
-    const day = currentDate.getDate();
+    const dayName = dayNames[baseDate.getDay()];
+    const monthName = monthNames[baseDate.getMonth()];
+    const day = baseDate.getDate();
     const dateString = `${dayName}, ${monthName} ${day}`;
 
     // 懒加载推荐问题：页面加载时立即触发（如果还没有加载过）
     useEffect(() => {
+        // tp/:id 等场景可以通过 disableRelatedQuestions 关闭该逻辑
+        if (disableRelatedQuestions) {
+            return;
+        }
+
         // 如果已经加载过，不再重复加载
         if (hasPreloadedQuestions.current || hasPreloaded || !cId) {
             return;
@@ -56,7 +68,7 @@ export function MorningBriefing({
             console.error('获取推荐问题失败:', error);
             hasPreloadedQuestions.current = false; // 失败时重置，允许重试
         });
-    }, [cId, hasPreloaded, onQuestionsPreloaded]);
+    }, [cId, hasPreloaded, onQuestionsPreloaded, disableRelatedQuestions]);
 
     // 如果有缓存的播放内容，直接使用（优先使用缓存）
     useEffect(() => {
@@ -475,12 +487,14 @@ export function MorningBriefing({
                     )}
 
                     {/* Location Selector */}
-                    <LocationSelector
-                        selectedLocation={selectedLocation}
-                        onSelect={onLocationSelect}
-                    />
+                    {!hideLocationSelector && (
+                        <LocationSelector
+                            selectedLocation={selectedLocation}
+                            onSelect={onLocationSelect}
+                        />
+                    )}
 
-                    {/* Talk to Assistant Button */}
+                    {/* Talk to Assistant / CTA Button */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -488,13 +502,29 @@ export function MorningBriefing({
                         className="w-full max-w-md"
                     >
                         <Glass variant="card" className="px-6 py-4">
-                            <button
-                                onClick={onTalkToAssistant}
-                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                            >
-                                <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
-                            </button>
+                            {ctaLink ? (
+                                <a
+                                    href={ctaLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                >
+                                    <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                    <span className="text-base font-medium text-[#010101]">
+                                        {ctaTextOverride || 'Chat with Leo'}
+                                    </span>
+                                </a>
+                            ) : (
+                                <button
+                                    onClick={onTalkToAssistant}
+                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                >
+                                    <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                    <span className="text-base font-medium text-[#010101]">
+                                        {ctaTextOverride || 'Chat with Leo'}
+                                    </span>
+                                </button>
+                            )}
                         </Glass>
                     </motion.div>
                 </div>

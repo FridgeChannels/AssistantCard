@@ -26,6 +26,27 @@ CREATE TABLE public.customer (
   integral numeric,
   CONSTRAINT customer_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.content_play (
+  id bigint NOT NULL DEFAULT nextval('content_play_id_seq'::regclass),
+  customer_id bigint NOT NULL,
+  original_content text,
+  rss_url character varying(500),
+  generated_play_text text,
+  audio_url character varying(500),
+  cta_text character varying(200),
+  cta_link character varying(500),
+  created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  original_title character varying(500) NOT NULL DEFAULT ''::character varying,
+  display_title character varying(500) NOT NULL DEFAULT ''::character varying,
+  team_name character varying(500),
+  front_image_url character varying(500),
+  logo_url character varying(500),
+  back_image_url character varying(500),
+  team_image_url character varying(500),
+  CONSTRAINT content_play_pkey PRIMARY KEY (id),
+  CONSTRAINT content_play_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(id)
+);
 CREATE TABLE public.magnet (
   id bigint NOT NULL,
   magnet_config_cta_id bigint NOT NULL,

@@ -96,6 +96,28 @@ export async function apiGetAgentInfo(magnetId) {
   }
 }
 
+// --------- Content play (tp/:id) ---------
+
+/**
+ * 根据 content_play 表主键 id 获取记录及解析出的 magnetId
+ * @param {string|number} id - content_play.id
+ * @returns {Promise<{ id, customer_id, magnetId, ... }|null>}
+ */
+export async function apiGetContentPlayById(id) {
+  if (id == null || id === '') return null;
+
+  try {
+    const data = await request(`/api/content-play/${encodeURIComponent(id)}`, {
+      method: 'GET',
+    });
+    return data ?? null;
+  } catch (error) {
+    if (error.status === 404) return null;
+    console.error('apiGetContentPlayById failed:', error);
+    throw error;
+  }
+}
+
 // --------- Play contents ---------
 
 export async function apiGetTodayPlayContent(magnetId = null) {

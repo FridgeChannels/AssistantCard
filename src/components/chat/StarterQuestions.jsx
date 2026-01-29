@@ -12,7 +12,8 @@ export function StarterQuestions({
     preloadedQuestions = [],
     isLoadingPreloaded = false,
     onQuestionsLoaded,
-    onLoadingChange
+    onLoadingChange,
+    skipFetch = false, // tp/:id 等场景不调用 api/related-questions
 }) {
     const [questions, setQuestions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -20,6 +21,15 @@ export function StarterQuestions({
 
     // 组件加载时获取问题
     useEffect(() => {
+        // 不调用推荐问题接口时，直接结束
+        if (skipFetch) {
+            setQuestions([]);
+            setIsLoading(false);
+            if (onLoadingChange) onLoadingChange(false);
+            hasFetched.current = true;
+            return;
+        }
+
         // 如果已经获取过，不再重复获取
         if (hasFetched.current) {
             return;
@@ -67,7 +77,7 @@ export function StarterQuestions({
 
         fetchQuestions();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cId, conversationId]);
+    }, [cId, conversationId, skipFetch]);
 
     // 当预加载的问题更新时，更新本地状态
     useEffect(() => {
@@ -84,8 +94,7 @@ export function StarterQuestions({
     }, [cId, conversationId]);
 
     const handleRefresh = () => {
-        // 刷新时重新获取问题
-        if (!cId) {
+        if (skipFetch || !cId) {
             return;
         }
 
