@@ -100,7 +100,7 @@ function TpPageWithRouter() {
     return (
       <MobileContainer backdropImage="/bg2.png">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center text-sothebys-navy/80">
-          <p className="text-sm">未找到该内容或链接已失效</p>
+          <p className="text-sm">Content not found or link has expired.</p>
         </div>
       </MobileContainer>
     )
