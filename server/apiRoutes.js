@@ -637,4 +637,91 @@ export function registerApiRoutes(app, supabase) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
+
+  // ---------------- Location Search Proxy ----------------
+  app.get('/api/location/search', async (req, res) => {
+    const { text } = req.query;
+    const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Search text is required' });
+    }
+
+    if (!GEOAPIFY_API_KEY) {
+      console.error('GEOAPIFY_API_KEY is not configured');
+      return res.status(500).json({ error: 'Location service is not configured on server' });
+    }
+
+    try {
+      const params = new URLSearchParams({
+        text: text,
+        format: 'json',
+        lang: 'en',
+        country: 'United States of America',
+        apiKey: GEOAPIFY_API_KEY
+      });
+
+      const response = await fetch(`https://api.geoapify.com/v1/geocode/search?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Geoapify API error:', response.status, errorText);
+        return res.status(response.status).send(errorText);
+      }
+
+      const data = await response.json();
+      return res.json(data);
+    } catch (error) {
+      console.error('Proxy Location Search API failed:', error);
+      return res.status(500).json({ error: 'Failed to search locations' });
+    }
+  });
+
+  // 更新 magnet 的 zip_code
+  app.patch('/api/magnets/:id/zip-code', async (req, res) => {
+    const { id } = req.params;
+    const { zipCode, city, state, country } = req.body || {};
+
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    if (!zipCode) {
+      return res.status(400).json({ error: 'zipCode is required' });
+    }
+
+    try {
+      // Upsert play_zip_code first (assuming zip_code is key)
+      const { error: upsertError } = await supabase
+        .from('play_zip_code')
+        .upsert({
+          zip_code: zipCode,
+          city: city || null,
+          state: state || null,
+          country: country || null,
+          // Add default coordinates if needed, or leave null
+          // lat: 0, lon: 0 
+        }, { onConflict: 'zip_code' });
+
+      if (upsertError) {
+        console.error('Error upserting play_zip_code:', upsertError);
+        return res.status(500).json({ error: 'Failed to update zip code reference' });
+      }
+
+      const { error } = await supabase
+        .from('magnet')
+        .update({ zip_code: zipCode })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating magnet zip_code:', error);
+        return res.status(500).json({ error: 'Failed to update zip code' });
+      }
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('Unexpected error in PATCH /api/magnets/:id/zip-code:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 }

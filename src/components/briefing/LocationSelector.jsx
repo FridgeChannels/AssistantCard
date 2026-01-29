@@ -1,50 +1,63 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Glass } from '../layout/Glass';
-import { Search, ChevronDown, MapPin, X } from 'lucide-react';
-
-const MOCK_CITIES = [
-    'Austin, TX',
-    'Atlanta, GA',
-    'Boston, MA',
-    'Chicago, IL',
-    'Dallas, TX',
-    'Denver, CO',
-    'Houston, TX',
-    'Los Angeles, CA',
-    'Miami, FL',
-    'New York, NY',
-    'San Francisco, CA',
-    'Seattle, WA',
-    'Washington, DC',
-];
+import { Search, ChevronDown, MapPin, X, Loader2 } from 'lucide-react';
+import { searchLocations } from '../../lib/locationService';
 
 export function LocationSelector({ selectedLocation, onSelect }) {
     const [query, setQuery] = useState(selectedLocation || '');
     const [showDropdown, setShowDropdown] = useState(false);
-    const [filteredCities, setFilteredCities] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [loading, setLoading] = useState(false);
     const wrapperRef = useRef(null);
+    const debounceTimeout = useRef(null);
 
-    // 当外部 selectedLocation 改变时，同步到输入框（保持可编辑）
+    // Sync query with prop
     useEffect(() => {
-        setQuery(selectedLocation || '');
+        if (selectedLocation && typeof selectedLocation === 'object') {
+            setQuery(selectedLocation.formatted || '');
+        } else {
+            setQuery(selectedLocation || '');
+        }
     }, [selectedLocation]);
 
+    // Handle search input with debounce
     useEffect(() => {
-        const q = (query || '').trim().toLowerCase();
-        if (q.length === 0) {
-            setFilteredCities(MOCK_CITIES);
-            // Don't auto-show dropdown here to prevent flashing, handled by onFocus
-        } else {
-            // 首字母/前缀优先，其次再用 contains 兜底（更“聪明”）
-            const prefix = MOCK_CITIES.filter(city => city.toLowerCase().startsWith(q));
-            const contains = prefix.length > 0
-                ? prefix
-                : MOCK_CITIES.filter(city => city.toLowerCase().includes(q));
-            setFilteredCities(contains);
-            setShowDropdown(true);
+        if (!showDropdown) return; // Only search if dropdown is/should be open
+
+        const q = (query || '').trim();
+
+        if (q.length < 2) {
+            setLocations([]);
+            setLoading(false);
+            return;
         }
-    }, [query]);
+
+        // Clear previous timeout
+        if (debounceTimeout.current) {
+            clearTimeout(debounceTimeout.current);
+        }
+
+        // Set loading immediately if user is typing
+        setLoading(true);
+
+        // Debounce API call
+        debounceTimeout.current = setTimeout(async () => {
+            try {
+                const results = await searchLocations(q);
+                setLocations(results);
+            } catch (err) {
+                console.error("Failed to fetch locations", err);
+                setLocations([]);
+            } finally {
+                setLoading(false);
+            }
+        }, 300); // 300ms debounce
+
+        return () => {
+            if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+        };
+    }, [query, showDropdown]);
 
     // Click outside to close dropdown
     useEffect(() => {
@@ -57,14 +70,14 @@ export function LocationSelector({ selectedLocation, onSelect }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleSelect = (city) => {
-        onSelect(city);
-        setQuery(city); // 选完后仍保留在输入框，可继续编辑
+    const handleSelect = (location) => {
+        onSelect(location);
+        setQuery(location.formatted);
         setShowDropdown(false);
     };
 
     return (
-        <div className="w-full max-w-md mb-8 relative z-20 mt-[-120px]" ref={wrapperRef}>
+        <div className="w-full max-w-md mb-8 relative z-20" ref={wrapperRef}>
             <div className="relative">
                 <Glass
                     variant="card"
@@ -73,7 +86,10 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                     onClick={() => {
                         // Focus input on wrapper click
                         const input = document.getElementById('location-input');
-                        if (input) input.focus();
+                        if (input) {
+                            input.focus();
+                            setShowDropdown(true);
+                        }
                     }}
                 >
                     <div className="flex items-center gap-2 w-full">
@@ -82,27 +98,24 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                             id="location-input"
                             type="text"
                             value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onFocus={(e) => {
-                                e.target.select();
-                                const q = (query || '').trim().toLowerCase();
-                                const prefix = MOCK_CITIES.filter(c => c.toLowerCase().startsWith(q));
-                                const contains = prefix.length > 0
-                                    ? prefix
-                                    : MOCK_CITIES.filter(c => c.toLowerCase().includes(q));
-                                setFilteredCities(q.length === 0 ? MOCK_CITIES : contains);
+                            onChange={(e) => {
+                                setQuery(e.target.value);
                                 setShowDropdown(true);
                             }}
+                            onFocus={() => setShowDropdown(true)}
                             placeholder="Pick an area to get local news"
                             className="flex-1 bg-transparent border-none outline-none text-[#010101] placeholder:text-gray-500 font-medium text-base cursor-pointer min-w-0"
+                            autoComplete="off"
                         />
-                        {query ? (
+                        {loading ? (
+                            <Loader2 className="w-4 h-4 text-sothebys-navy animate-spin" />
+                        ) : query ? (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setQuery('');
                                     onSelect(null);
-                                    setFilteredCities(MOCK_CITIES);
+                                    setLocations([]);
                                     const input = document.getElementById('location-input');
                                     if (input) input.focus();
                                 }}
@@ -117,7 +130,7 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                 </Glass>
 
                 <AnimatePresence>
-                    {showDropdown && filteredCities.length > 0 && (
+                    {showDropdown && (query.length >= 2 || locations.length > 0) && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -125,15 +138,26 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                             className="absolute top-full left-0 right-0 mt-2 z-30 overflow-hidden"
                         >
                             <Glass variant="card" className="py-2 max-h-60 overflow-y-auto">
-                                {filteredCities.map((city) => (
-                                    <button
-                                        key={city}
-                                        onClick={() => handleSelect(city)}
-                                        className="w-full text-left px-4 py-2 hover:bg-[#010101]/5 active:bg-[#010101]/10 transition-colors text-[#010101]"
-                                    >
-                                        {city}
-                                    </button>
-                                ))}
+                                {locations.length > 0 ? (
+                                    locations.map((loc, index) => (
+                                        <button
+                                            key={`${loc.formatted}-${index}`}
+                                            onClick={() => handleSelect(loc)}
+                                            className="w-full text-left px-4 py-2 hover:bg-[#010101]/5 active:bg-[#010101]/10 transition-colors text-[#010101]"
+                                        >
+                                            <div className="font-medium text-sm text-[#010101]">{loc.formatted}</div>
+                                            {(loc.city !== loc.formatted && loc.county) && (
+                                                <div className="text-xs text-gray-500">{loc.county}</div>
+                                            )}
+                                        </button>
+                                    ))
+                                ) : (
+                                    !loading && query.length >= 2 && (
+                                        <div className="px-4 py-3 text-center text-gray-500 text-sm">
+                                            No locations found
+                                        </div>
+                                    )
+                                )}
                             </Glass>
                         </motion.div>
                     )}

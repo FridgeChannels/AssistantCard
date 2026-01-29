@@ -285,7 +285,7 @@ export function MorningBriefing({
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="w-full max-w-md mb-6 min-h-[354px]"
+                            className="w-full max-w-md mb-6"
                         >
                             <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
                                 <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-800 rounded-full animate-spin mb-4"></div>
@@ -299,7 +299,7 @@ export function MorningBriefing({
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="w-full max-w-md mb-6 min-h-[354px]"
+                            className="w-full max-w-md mb-6"
                         >
                             <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
                                 <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
@@ -315,7 +315,7 @@ export function MorningBriefing({
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5 }}
-                            className="w-full max-w-md mb-3 min-h-[354px]"
+                            className="w-full max-w-md mb-3"
                         >
                             <Glass variant="panel" className="p-8 flex flex-col justify-between">
                                 <div className="flex flex-col items-center">
@@ -499,7 +499,7 @@ export function MorningBriefing({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
-                        className="w-full max-w-md"
+                        className="w-full max-w-md mt-24"
                     >
                         <Glass variant="card" className="px-6 py-4">
                             {ctaLink ? (

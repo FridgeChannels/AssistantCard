@@ -12,6 +12,7 @@ import { History } from './components/history/History';
 import { sendChatMessageStream } from './lib/chatService';
 import { getAgentInfo } from './lib/agentService';
 import { getRelatedQuestions } from './lib/relatedQuestionsService';
+import { updateMagnetZip } from './lib/locationService';
 import { logUserAction, logChatMessage } from './lib/loggingService';
 import { pageTimeTracker } from './lib/pageTimeTracker';
 import { Info, ArrowLeft } from 'lucide-react';
@@ -466,7 +467,12 @@ function App({ cId = '' }) {
                 }}
                 onSavePlaybackState={handleSavePlaybackState}
                 selectedLocation={selectedLocation}
-                onLocationSelect={setSelectedLocation}
+                onLocationSelect={(location) => {
+                  setSelectedLocation(location);
+                  if (location && location.postcode && cId) {
+                    updateMagnetZip(cId, location);
+                  }
+                }}
               />
             </motion.div>
           ) : page === 'musicChat' ? (
