@@ -160,8 +160,8 @@ export function MorningBriefing({
                     onPlayContentLoadingChange(true);
                 }
 
-                // Fetch today's play content (pass null to get global content)
-                const content = await getTodayPlayContent(null);
+                // Fetch play content (magnetId = cId：有 zip_code 时按 zip 优先，否则取最新)
+                const content = await getTodayPlayContent(cId || null);
 
                 if (!content) {
                     setError('No content available at the moment');
@@ -242,11 +242,11 @@ export function MorningBriefing({
             });
             setIsPlaying(true);
 
-            // 创建播放日志
+            // 创建播放日志（写入 play_news_contents_id）
             playStartTime.current = Date.now();
             const logId = await createPlayContentLog({
                 cId: cId,
-                playContentId: playContent?.id,
+                playNewsContentsId: playContent?.id ?? null,
             });
             currentPlayLogId.current = logId;
         }

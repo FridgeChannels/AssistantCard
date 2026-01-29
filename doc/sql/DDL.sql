@@ -34,8 +34,10 @@ CREATE TABLE public.magnet (
   url character varying,
   role character varying,
   stage character varying,
-  CONSTRAINT magnet_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_magnet_tag_magnet FOREIGN KEY (id) REFERENCES public.magnet_config(id)
+  sn character varying,
+  zip_code character varying,
+  CONSTRAINT magnet_pkey1 PRIMARY KEY (id),
+  CONSTRAINT magnet_zip_code_fkey FOREIGN KEY (zip_code) REFERENCES public.play_zip_code(zip_code)
 );
 CREATE TABLE public.magnet_config_cta (
   id bigint NOT NULL DEFAULT nextval('cta_id_seq'::regclass),
@@ -148,6 +150,7 @@ CREATE TABLE public.play_content_log (
   megnet_config_qa_id bigint,
   start_time timestamp without time zone,
   end_time timestamp without time zone,
+  play_news_contents_id bigint,
   CONSTRAINT play_content_log_pkey PRIMARY KEY (id),
   CONSTRAINT play_content_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(id),
   CONSTRAINT play_content_log_qa_id_fkey FOREIGN KEY (magnet_id) REFERENCES public.base_qa(id),
@@ -166,6 +169,23 @@ CREATE TABLE public.play_contents (
   has_played boolean NOT NULL DEFAULT false,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT play_contents_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.play_news_contents (
+  id bigint NOT NULL DEFAULT nextval('play_fridge_contents_id_seq'::regclass),
+  raw_news_id bigint NOT NULL,
+  city character varying NOT NULL,
+  target_user character varying,
+  headline text NOT NULL,
+  context_text text NOT NULL,
+  meaning_text text,
+  display_priority integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  zip_code character varying,
+  audio_url character varying,
+  CONSTRAINT play_news_contents_pkey PRIMARY KEY (id),
+  CONSTRAINT play_fridge_contents_raw_news_id_fkey FOREIGN KEY (raw_news_id) REFERENCES public.play_raw_news(id),
+  CONSTRAINT play_news_contents_target_user_check CHECK (target_user::text = ANY (ARRAY['buyer'::text, 'seller'::text, 'all'::text]))
 );
 CREATE TABLE public.usage_request_log (
   id bigint NOT NULL DEFAULT nextval('usage_request_log_id_seq'::regclass),

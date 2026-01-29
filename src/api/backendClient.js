@@ -98,8 +98,8 @@ export async function apiGetAgentInfo(magnetId) {
 
 // --------- Play contents ---------
 
-export async function apiGetTodayPlayContent(customerId = null) {
-  const query = customerId ? `?customerId=${encodeURIComponent(customerId)}` : '';
+export async function apiGetTodayPlayContent(magnetId = null) {
+  const query = magnetId ? `?magnetId=${encodeURIComponent(magnetId)}` : '';
 
   try {
     const data = await request(`/api/play-contents/today${query}`, {
@@ -109,20 +109,6 @@ export async function apiGetTodayPlayContent(customerId = null) {
   } catch (error) {
     console.error('apiGetTodayPlayContent failed:', error);
     return null;
-  }
-}
-
-export async function apiMarkPlayContentAsPlayed(contentId) {
-  if (!contentId) return false;
-
-  try {
-    await request(`/api/play-contents/${encodeURIComponent(contentId)}/played`, {
-      method: 'POST',
-    });
-    return true;
-  } catch (error) {
-    console.error('apiMarkPlayContentAsPlayed failed:', error);
-    return false;
   }
 }
 

@@ -100,16 +100,26 @@ export async function logChatMessage({
 }
 
 /**
+ * 规范为有效的 play_news_contents.id（bigint 数值），否则返回 null。
+ * 拒绝 UUID、非数字字符串等，确保只传数值类型。
+ */
+function toValidPlayNewsContentsId(v) {
+    if (v == null) return null;
+    const n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : NaN);
+    return (typeof n === 'number' && !Number.isNaN(n) && n >= 0) ? n : null;
+}
+
+/**
  * 创建播放日志记录
  * @param {object} params - 播放日志参数
  * @param {string} params.cId - Customer/Magnet ID
- * @param {string} params.playContentId - 播放内容ID (Ignored, no column)
+ * @param {number} [params.playNewsContentsId] - play_news_contents.id（数值），音频来源
  * @param {number} [params.magnetConfigQaId] - 问题库ID
  * @returns {Promise<number|null>} 日志记录ID
  */
 export async function createPlayContentLog({
     cId,
-    playContentId,
+    playNewsContentsId = null,
     magnetConfigQaId = null,
 }) {
     try {
@@ -120,10 +130,11 @@ export async function createPlayContentLog({
 
         const sessionId = getOrCreateSessionId();
         const deviceInfo = getDeviceInfo();
+        const newsId = toValidPlayNewsContentsId(playNewsContentsId);
 
         const id = await apiCreatePlayLog({
             cId,
-            playContentId,
+            play_news_contents_id: newsId,
             magnetConfigQaId,
             sessionId,
             deviceInfo,

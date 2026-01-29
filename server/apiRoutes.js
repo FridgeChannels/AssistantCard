@@ -384,91 +384,61 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
-  // 获取今日播放内容（带 fallback 逻辑）
+  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先）
   app.get('/api/play-contents/today', async (req, res) => {
-    const { customerId } = req.query;
+    const { magnetId } = req.query;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      let zipCode = null;
+      if (magnetId) {
+        const { data: magnet, error: magnetErr } = await supabase
+          .from('magnet')
+          .select('zip_code')
+          .eq('id', magnetId)
+          .maybeSingle();
+        if (!magnetErr && magnet?.zip_code) zipCode = magnet.zip_code;
+      }
 
-      let query = supabase
-        .from('play_contents')
-        .select('id, title, audio_url')
-        .eq('scheduled_date', today)
-        .order('created_at', { ascending: false })
+      const selectCols = 'id, headline, audio_url';
+      const orderOpt = { ascending: false };
+
+      if (zipCode) {
+        const { data: byZip, error: zipErr } = await supabase
+          .from('play_news_contents')
+          .select(selectCols)
+          .eq('zip_code', zipCode)
+          .order('created_at', orderOpt)
+          .limit(1);
+
+        if (!zipErr && byZip?.length > 0) {
+          return res.json({
+            content: { id: byZip[0].id, title: byZip[0].headline, audio_url: byZip[0].audio_url },
+            from: 'zip_code',
+          });
+        }
+      }
+
+      const { data: latest, error: latestErr } = await supabase
+        .from('play_news_contents')
+        .select(selectCols)
+        .order('created_at', orderOpt)
         .limit(1);
 
-      if (customerId) {
-        query = query.eq('customer_id', customerId);
-      } else {
-        query = query.is('customer_id', null);
+      if (latestErr) {
+        console.error('Error querying play_news_contents:', latestErr);
+        return res.status(500).json({ error: 'Failed to query play_news_contents' });
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error querying today play content:', error);
-        return res.status(500).json({ error: 'Failed to query today play content' });
-      }
-
-      if (data && data.length > 0) {
-        return res.json({ content: data[0], from: 'today' });
-      }
-
-      // fallback: latest
-      let latestQuery = supabase
-        .from('play_contents')
-        .select('id, title, audio_url')
-        .order('scheduled_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (customerId) {
-        latestQuery = latestQuery.eq('customer_id', customerId);
-      } else {
-        latestQuery = latestQuery.is('customer_id', null);
-      }
-
-      const { data: latestData, error: latestError } = await latestQuery;
-
-      if (latestError) {
-        console.error('Error querying latest play content:', latestError);
-        return res.status(500).json({ error: 'Failed to query latest play content' });
-      }
-
-      if (latestData && latestData.length > 0) {
-        return res.json({ content: latestData[0], from: 'latest' });
+      if (latest?.length > 0) {
+        return res.json({
+          content: { id: latest[0].id, title: latest[0].headline, audio_url: latest[0].audio_url },
+          from: zipCode ? 'latest_fallback' : 'latest',
+        });
       }
 
       return res.json({ content: null, from: 'none' });
     } catch (err) {
       console.error('Unexpected error in /api/play-contents/today:', err);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // 标记内容为已播放
-  app.post('/api/play-contents/:id/played', async (req, res) => {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({ error: 'content id is required' });
-    }
-
-    try {
-      const { error } = await supabase
-        .from('play_contents')
-        .update({ has_played: true, is_playing: false })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating play_contents:', error);
-        return res.status(500).json({ error: 'Failed to mark as played' });
-      }
-
-      return res.json({ success: true });
-    } catch (err) {
-      console.error('Unexpected error in /api/play-contents/:id/played:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -549,7 +519,7 @@ export function registerApiRoutes(app, supabase) {
 
   // 播放日志：创建
   app.post('/api/play-logs', async (req, res) => {
-    const { cId, magnetConfigQaId, sessionId, deviceInfo } = req.body || {};
+    const { cId, magnetConfigQaId, play_news_contents_id, sessionId, deviceInfo } = req.body || {};
 
     if (!cId || !sessionId) {
       return res.status(400).json({ error: 'cId and sessionId are required' });
@@ -563,6 +533,13 @@ export function registerApiRoutes(app, supabase) {
       }
 
       const startTime = new Date().toISOString();
+      // play_news_contents_id 必须为数值（play_news_contents.id），拒绝 UUID 等
+      let newsContentId = null;
+      if (play_news_contents_id != null) {
+        const n = Number(play_news_contents_id);
+        const isUuid = typeof play_news_contents_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(play_news_contents_id);
+        if (!isUuid && !Number.isNaN(n) && n >= 0) newsContentId = n;
+      }
 
       const { data, error } = await supabase
         .from('play_content_log')
@@ -570,6 +547,7 @@ export function registerApiRoutes(app, supabase) {
           user_id: userId,
           magnet_id: Number.isNaN(Number(cId)) ? null : Number(cId),
           megnet_config_qa_id: magnetConfigQaId ?? null,
+          play_news_contents_id: newsContentId,
           play_time: startTime,
           start_time: startTime,
           duration: 0,
