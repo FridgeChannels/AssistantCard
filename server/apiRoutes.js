@@ -389,6 +389,9 @@ export function registerApiRoutes(app, supabase) {
       const selectCols = 'id, headline, audio_url';
       const orderOpt = { ascending: false };
 
+      const hasZipCode = !!zipCode;
+      const locationFormatted = magnetId && zipCode ? (await supabase.from('magnet').select('formatted').eq('id', magnetId).maybeSingle()).data?.formatted : null;
+
       if (zipCode) {
         const { data: byZip, error: zipErr } = await supabase
           .from('play_news_contents')
@@ -401,6 +404,8 @@ export function registerApiRoutes(app, supabase) {
           return res.json({
             content: { id: byZip[0].id, title: byZip[0].headline, audio_url: byZip[0].audio_url },
             from: 'zip_code',
+            hasZipCode,
+            locationFormatted,
           });
         }
       }
@@ -421,10 +426,12 @@ export function registerApiRoutes(app, supabase) {
         return res.json({
           content: { id: latest[0].id, title: latest[0].headline, audio_url: latest[0].audio_url },
           from: zipCode ? 'latest_fallback' : 'latest',
+          hasZipCode,
+          locationFormatted,
         });
       }
 
-      return res.json({ content: null, from: 'none' });
+      return res.json({ content: null, from: 'none', hasZipCode, locationFormatted });
     } catch (err) {
       console.error('Unexpected error in /api/play-contents/today:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -680,7 +687,7 @@ export function registerApiRoutes(app, supabase) {
   // 更新 magnet 的 zip_code
   app.patch('/api/magnets/:id/zip-code', async (req, res) => {
     const { id } = req.params;
-    const { zipCode, city, state, country } = req.body || {};
+    const { zipCode, city, state, country, formatted } = req.body || {};
 
     if (!id) {
       return res.status(400).json({ error: 'id is required' });
@@ -691,26 +698,19 @@ export function registerApiRoutes(app, supabase) {
     }
 
     try {
-      // Upsert play_zip_code first (assuming zip_code is key)
-      const { error: upsertError } = await supabase
-        .from('play_zip_code')
-        .upsert({
-          zip_code: zipCode,
-          city: city || null,
-          state: state || null,
-          country: country || null,
-          // Add default coordinates if needed, or leave null
-          // lat: 0, lon: 0 
-        }, { onConflict: 'zip_code' });
+      // -----------------------------------------------------------
+      // [REMOVED] play_zip_code table has been deleted.
+      // Previously handled upsert to play_zip_code here.
+      // -----------------------------------------------------------
 
-      if (upsertError) {
-        console.error('Error upserting play_zip_code:', upsertError);
-        return res.status(500).json({ error: 'Failed to update zip code reference' });
+      const updatePayload = { zip_code: zipCode };
+      if (formatted !== undefined) {
+        updatePayload.formatted = formatted;
       }
 
       const { error } = await supabase
         .from('magnet')
-        .update({ zip_code: zipCode })
+        .update(updatePayload)
         .eq('id', id);
 
       if (error) {

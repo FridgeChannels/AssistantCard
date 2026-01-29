@@ -58,7 +58,6 @@ CREATE TABLE public.magnet (
   sn character varying,
   zip_code character varying,
   CONSTRAINT magnet_pkey1 PRIMARY KEY (id),
-  CONSTRAINT magnet_zip_code_fkey FOREIGN KEY (zip_code) REFERENCES public.play_zip_code(zip_code)
 );
 CREATE TABLE public.magnet_config_cta (
   id bigint NOT NULL DEFAULT nextval('cta_id_seq'::regclass),

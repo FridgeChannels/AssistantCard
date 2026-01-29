@@ -80,6 +80,7 @@ export async function updateMagnetZip(id, locationData) {
     const city = typeof locationData === 'object' ? locationData.city : null;
     const state = typeof locationData === 'object' ? locationData.state : null;
     const country = typeof locationData === 'object' ? locationData.country : null;
+    const formatted = typeof locationData === 'object' ? locationData.formatted : null;
 
     if (!zipCode) return false;
 
@@ -93,7 +94,8 @@ export async function updateMagnetZip(id, locationData) {
                 zipCode,
                 city,
                 state,
-                country
+                country,
+                formatted
             })
         });
 

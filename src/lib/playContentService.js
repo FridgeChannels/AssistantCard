@@ -11,8 +11,8 @@ import { apiGetTodayPlayContent } from '../api/backendClient.js'
  */
 export async function getTodayPlayContent(magnetId = null) {
     try {
-        const content = await apiGetTodayPlayContent(magnetId)
-        return content
+        const response = await apiGetTodayPlayContent(magnetId)
+        return response ? response.content : null
     } catch (error) {
         console.error('获取播放内容时发生错误:', error)
         return null
@@ -27,8 +27,20 @@ export async function getTodayPlayContent(magnetId = null) {
  */
 export async function getLatestPlayContent(magnetId = null) {
     try {
-        const content = await apiGetTodayPlayContent(magnetId)
-        return content
+        const response = await apiGetTodayPlayContent(magnetId)
+        return response ? response.content : null
+    } catch (error) {
+        console.error('获取最新播放内容时发生错误:', error)
+        return null
+    }
+}
+
+/**
+ * 获取播放内容及元数据
+ */
+export async function getPlayContentWithMeta(magnetId = null) {
+    try {
+        return await apiGetTodayPlayContent(magnetId)
     } catch (error) {
         console.error('获取最新播放内容时发生错误:', error)
         return null

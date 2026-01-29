@@ -11,6 +11,7 @@ export function LocationSelector({ selectedLocation, onSelect }) {
     const [loading, setLoading] = useState(false);
     const wrapperRef = useRef(null);
     const debounceTimeout = useRef(null);
+    const latestQueryRef = useRef(query);
 
     // Sync query with prop
     useEffect(() => {
@@ -20,6 +21,11 @@ export function LocationSelector({ selectedLocation, onSelect }) {
             setQuery(selectedLocation || '');
         }
     }, [selectedLocation]);
+
+    // Update ref whenever query changes
+    useEffect(() => {
+        latestQueryRef.current = query;
+    }, [query]);
 
     // Handle search input with debounce
     useEffect(() => {
@@ -43,14 +49,25 @@ export function LocationSelector({ selectedLocation, onSelect }) {
 
         // Debounce API call
         debounceTimeout.current = setTimeout(async () => {
+            // Check if query is still current before making request (optimization)
+            if (q !== latestQueryRef.current) return;
+
             try {
                 const results = await searchLocations(q);
+
+                // Check if query is still current after request
+                if (q !== latestQueryRef.current) return;
+
                 setLocations(results);
             } catch (err) {
+                if (q !== latestQueryRef.current) return;
                 console.error("Failed to fetch locations", err);
                 setLocations([]);
             } finally {
-                setLoading(false);
+                // Only turn off loading if this was the latest request
+                if (q === latestQueryRef.current) {
+                    setLoading(false);
+                }
             }
         }, 300); // 300ms debounce
 
@@ -93,7 +110,7 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                     }}
                 >
                     <div className="flex items-center gap-2 w-full">
-                        <MapPin className={`w-4 h-4 flex-shrink-0 transition-colors ${showDropdown ? 'text-sothebys-navy' : 'text-gray-400'}`} />
+                        <MapPin className={`w-4 h-4 flex-shrink-0 transition-colors ${showDropdown ? 'text-sothebys-navy' : 'text-black'}`} />
                         <input
                             id="location-input"
                             type="text"
@@ -103,8 +120,8 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                                 setShowDropdown(true);
                             }}
                             onFocus={() => setShowDropdown(true)}
-                            placeholder="Pick an area to get local news"
-                            className="flex-1 bg-transparent border-none outline-none text-[#010101] placeholder:text-gray-500 font-medium text-base cursor-pointer min-w-0"
+                            placeholder="Pick an area"
+                            className="flex-1 bg-transparent border-none outline-none text-[#010101] font-medium text-base cursor-pointer min-w-0 text-center"
                             autoComplete="off"
                         />
                         {loading ? (
@@ -121,11 +138,9 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                                 }}
                                 className="p-1 hover:bg-black/5 rounded-full transition-colors"
                             >
-                                <X className="w-4 h-4 text-gray-400" />
+                                <X className="w-4 h-4 text-black" />
                             </button>
-                        ) : (
-                            <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-                        )}
+                        ) : null}
                     </div>
                 </Glass>
 
@@ -147,13 +162,13 @@ export function LocationSelector({ selectedLocation, onSelect }) {
                                         >
                                             <div className="font-medium text-sm text-[#010101]">{loc.formatted}</div>
                                             {(loc.city !== loc.formatted && loc.county) && (
-                                                <div className="text-xs text-gray-500">{loc.county}</div>
+                                                <div className="text-xs text-black">{loc.county}</div>
                                             )}
                                         </button>
                                     ))
                                 ) : (
                                     !loading && query.length >= 2 && (
-                                        <div className="px-4 py-3 text-center text-gray-500 text-sm">
+                                        <div className="px-4 py-3 text-center text-black text-sm">
                                             No locations found
                                         </div>
                                     )

@@ -127,7 +127,7 @@ export async function apiGetTodayPlayContent(magnetId = null) {
     const data = await request(`/api/play-contents/today${query}`, {
       method: 'GET',
     });
-    return data?.content ?? null;
+    return data ?? null;
   } catch (error) {
     console.error('apiGetTodayPlayContent failed:', error);
     return null;
