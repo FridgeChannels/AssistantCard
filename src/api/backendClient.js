@@ -56,6 +56,7 @@ export async function apiGetMagnetBySn(sn) {
     const data = await request(`/api/magnets/by-sn/${encodeURIComponent(sn)}`, {
       method: 'GET',
     });
+    // Now returns { id, formatted, zipCode }
     return data ?? null;
   } catch (error) {
     if (error.status === 404) {

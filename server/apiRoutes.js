@@ -298,7 +298,7 @@ export function registerApiRoutes(app, supabase) {
       const { data: magnetRow, error } = await timing.time('sb_magnet_by_sn', () =>
         supabase
           .from('magnet')
-          .select('id, stage, magnet_config_id, magnet_config_cta_id')
+          .select('id, stage, magnet_config_id, magnet_config_cta_id, formatted, zip_code')
           .eq('sn', sn)
           .maybeSingle(),
       );
@@ -312,7 +312,7 @@ export function registerApiRoutes(app, supabase) {
         return res.status(404).json({ error: 'Magnet not found' });
       }
 
-      const payload = { id: magnetRow.id, stage: magnetRow.stage || '' };
+      const payload = { id: magnetRow.id, stage: magnetRow.stage || '', formatted: magnetRow.formatted || '', zipCode: magnetRow.zip_code || '' };
 
       const ctaPromise = magnetRow.magnet_config_cta_id
         ? timing.time('sb_cta', () =>

@@ -13,14 +13,18 @@ function AppWithRouter() {
   const { sn } = useParams()
   const [magnetId, setMagnetId] = useState('')
   const [magnetContext, setMagnetContext] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [magnetInfo, setMagnetInfo] = useState(null)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
 
     async function resolveMagnet() {
       if (!sn) {
         setMagnetId('')
         setMagnetContext(null)
+        if (!cancelled) setLoading(false)
         return
       }
 
@@ -29,13 +33,17 @@ function AppWithRouter() {
         if (!cancelled) {
           setMagnetId(data?.id ?? '')
           setMagnetContext(data ? { solution: data.solution, cta: data.cta } : null)
+          setMagnetInfo(data)
         }
       } catch (e) {
         console.error('根据 SN 获取 magnet 信息失败:', e)
         if (!cancelled) {
           setMagnetId('')
           setMagnetContext(null)
+          setMagnetInfo(null)
         }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -46,8 +54,25 @@ function AppWithRouter() {
     }
   }, [sn])
 
-  // cId 为 magnet 表 id；sn 为 URL 路径值；magnetContext 含 solution、cta，供 Play Content 下 CTA 按钮等使用
-  return <App cId={magnetId || ''} sn={sn || ''} magnetContext={magnetContext} />
+  if (loading) {
+    return (
+      <MobileContainer backdropImage="/bg2.png">
+        <div className="flex-1 flex flex-col items-center justify-center text-sothebys-navy/80">
+          <div className="w-8 h-8 border-2 border-sothebys-navy/30 border-t-sothebys-navy rounded-full animate-spin" />
+        </div>
+      </MobileContainer>
+    )
+  }
+
+  // cId 为 magnet 表 id；sn 为 URL 路径值；magnetContext 含 solution、cta；initialLocation 兼容引导页
+  return (
+    <App
+      cId={magnetId || ''}
+      sn={sn || ''}
+      magnetContext={magnetContext}
+      initialLocation={magnetInfo ? { formatted: magnetInfo.formatted, zipCode: magnetInfo.zipCode } : null}
+    />
+  )
 }
 
 // /tp/:id 路由：id 为 content_play 表主键，解析出 magnetId 后渲染独立页面

@@ -80,10 +80,22 @@ export function MorningBriefing({
     ctaTextOverride,
     ctaLink,
     disableRelatedQuestions = false,
+    initialLocation = null,
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [playContent, setPlayContent] = useState(cachedPlayContent); // 使用缓存的播放内容
-    const [isLoading, setIsLoading] = useState(!cachedPlayContent); // 如果有缓存，不需要加载状态
+    // Use cachedPlayContent if available, otherwise construct initial using initialLocation if available
+    const [playContent, setPlayContent] = useState(() => {
+        if (cachedPlayContent) return cachedPlayContent;
+        if (initialLocation && initialLocation.formatted) {
+            return {
+                locationFormatted: initialLocation.formatted,
+                hasZipCode: !!initialLocation.zipCode,
+                // Other fields will be populated when fetch completes
+            };
+        }
+        return null;
+    });
+    const [isLoading, setIsLoading] = useState(!cachedPlayContent && !playContent); // Only load if we don't have any content
     const [error, setError] = useState(null);
     const [audioElement, setAudioElement] = useState(null);
     const hasPreloadedQuestions = useRef(false); // 防止重复调用接口A
@@ -213,20 +225,27 @@ export function MorningBriefing({
     // Load play content - 只在首次加载时请求，或重新加载页面时请求
     useEffect(() => {
         // 如果有缓存，或者正在加载，或者已经加载过，不再重复请求
-        if (cachedPlayContent || isLoadingPlayContent || hasLoadedPlayContent.current) {
+        // 注意：这里 isLoadingPlayContent 可能是父组件传入的props (false)，不要混淆
+        // 这里的逻辑主要是为了防止多次调用 getTodayPlayContent
+
+        if (cachedPlayContent || hasLoadedPlayContent.current) {
             return;
         }
 
         async function loadPlayContent() {
             // 防止并发请求：再次检查状态
-            if (hasLoadedPlayContent.current || isLoadingPlayContent || cachedPlayContent) {
+            if (hasLoadedPlayContent.current || cachedPlayContent) {
                 return;
             }
 
             hasLoadedPlayContent.current = true;
 
             try {
-                setIsLoading(true);
+                // Only show loading state if we don't have tentative content
+                if (!playContent) {
+                    setIsLoading(true);
+                }
+
                 setError(null);
                 if (onPlayContentLoadingChange) {
                     onPlayContentLoadingChange(true);
@@ -256,6 +275,7 @@ export function MorningBriefing({
                 if (onPlayContentLoaded) {
                     onPlayContentLoaded(content);
                 }
+
 
                 // Create audio element if audio URL exists
                 if (content.audio_url) {
@@ -625,7 +645,7 @@ export function MorningBriefing({
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
-                                className="w-full max-w-md mt-6 px-4 py-2 text-center text-sm font-medium text-gray-500 hover:text-[#010101] transition-colors"
+                                className="w-full max-w-md px-4 py-2 text-center text-sm font-medium text-gray-500 hover:text-[#010101] transition-colors"
                             >
                                 {playContent.locationFormatted}
                             </button>
