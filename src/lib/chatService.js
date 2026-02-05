@@ -5,6 +5,10 @@
 
 const API_URL = '/api/chat-messages';
 
+// Assistant Prompt API Configuration from environment variables
+const ASSISTANT_PROMPT_API_URL = import.meta.env.VITE_ASSISTANT_PROMPT_API_URL;
+const ASSISTANT_PROMPT_API_TOKEN = import.meta.env.VITE_ASSISTANT_PROMPT_API_TOKEN;
+
 /**
  * Send a chat message and handle streaming response
  * @param {string} query - User's question
@@ -398,6 +402,221 @@ export async function sendChatMessageStream(
     onComplete?.(fullAnswer || "I'm sorry, I didn't receive a valid response. Please try again.", newConversationId, extractedAnswerMethod || undefined);
   } catch (error) {
     console.error('Chat API call failed:', error);
+    onError?.(error);
+  }
+}
+
+/**
+ * Send a chat message to the Assistant Prompt API with streaming response
+ * Uses the API configured in environment variables
+ * @param {string} query - User's question
+ * @param {string} cId - Customer ID (for context)
+ * @param {string} conversationId - Conversation ID (optional, for maintaining context)
+ * @param {Function} onChunk - Callback when a data chunk is received (chunk: string) => void
+ * @param {Function} onComplete - Callback when complete (answer: string, conversationId: string) => void
+ * @param {Function} onError - Callback on error (error: Error) => void
+ * @param {string} agentName - Agent name (optional, defaults to empty string)
+ */
+export async function sendAssistantPromptMessageStream(
+  query,
+  cId,
+  conversationId = '',
+  onChunk,
+  onComplete,
+  onError,
+  agentName = ''
+) {
+  if (!ASSISTANT_PROMPT_API_URL) {
+    const error = new Error('Assistant Prompt API URL is not configured. Please set VITE_ASSISTANT_PROMPT_API_URL in environment variables.');
+    onError?.(error);
+    return;
+  }
+
+  if (!ASSISTANT_PROMPT_API_TOKEN) {
+    const error = new Error('Assistant Prompt API Token is not configured. Please set VITE_ASSISTANT_PROMPT_API_TOKEN in environment variables.');
+    onError?.(error);
+    return;
+  }
+
+  try {
+    const debugStream =
+      typeof window !== 'undefined' &&
+      window.localStorage &&
+      window.localStorage.getItem('stream_debug') === '1';
+    const streamStartAt = Date.now();
+    let lastChunkAt = streamStartAt;
+    
+    const response = await fetch(ASSISTANT_PROMPT_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ASSISTANT_PROMPT_API_TOKEN}`,
+        'User-Agent': 'FC-Assistant/1.0'
+      },
+      body: JSON.stringify({
+        inputs: {
+          magnet_id: cId,
+          agent_name: agentName || '',
+        },
+        query: query,
+        response_mode: 'streaming',
+        conversation_id: conversationId,
+        user: cId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Assistant Prompt API request failed: ${response.status} - ${errorText}`);
+    }
+
+    // Check if response is JSON or streaming
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      // Non-streaming JSON response (shouldn't happen, but handle it)
+      if (debugStream) {
+        console.log('[assistant-prompt-stream] non-streaming JSON response');
+      }
+      const data = await response.json();
+      const answer = data.answer || "I'm sorry, I didn't receive a valid response. Please try again.";
+      onChunk?.(answer);
+      onComplete?.(answer, data.conversation_id || conversationId);
+      return;
+    }
+
+    if (!response.body) {
+      if (debugStream) {
+        console.log('[assistant-prompt-stream] missing response body');
+      }
+      throw new Error('Assistant Prompt API response body is empty.');
+    }
+
+    // Process streaming response (plain text format)
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullAnswer = '';
+    let newConversationId = conversationId;
+    const appendAnswerChunk = (text) => {
+      if (!text) return;
+      const normalized = String(text);
+      if (normalized.startsWith(fullAnswer)) {
+        const delta = normalized.slice(fullAnswer.length);
+        if (delta) {
+          fullAnswer += delta;
+          onChunk?.(delta);
+        }
+      } else {
+        fullAnswer += normalized;
+        onChunk?.(normalized);
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        // Process any remaining buffer as plain text
+        if (buffer.trim()) {
+          appendAnswerChunk(buffer.trim());
+        }
+        break;
+      }
+
+      if (debugStream) {
+        const now = Date.now();
+        console.log('[assistant-prompt-stream] chunk received', {
+          bytes: value?.length || 0,
+          msFromStart: now - streamStartAt,
+          msSinceLast: now - lastChunkAt,
+        });
+        lastChunkAt = now;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+
+      // Keep the last incomplete line in buffer
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+
+        // Handle SSE format: data: <JSON>
+        if (line.startsWith('data: ')) {
+          const content = line.substring(6); // Remove 'data: ' prefix
+
+          try {
+            const data = JSON.parse(content);
+
+            // Handle error event
+            if (data.event === 'error') {
+              const errorMessage = data.message || 'An error occurred while processing your request.';
+              const error = new Error(errorMessage);
+              error.code = data.code;
+              error.status = data.status;
+              onError?.(error);
+              return; // Exit early on error
+            }
+
+            // Extract answer text from message events
+            if (data.answer && (data.event === 'message' || data.event === 'agent_message' || !data.event)) {
+              appendAnswerChunk(data.answer);
+            }
+
+            // Extract conversation_id from JSON if present
+            if (data.conversation_id) {
+              newConversationId = data.conversation_id;
+            }
+
+            // Check for end event markers
+            if (data.event === 'message_end' || data.event === 'workflow_finished') {
+              break;
+            }
+          } catch (e) {
+            // If not JSON, treat as plain text (fallback)
+            console.warn('[assistant-prompt-stream] Failed to parse SSE data as JSON:', e, content);
+            appendAnswerChunk(content);
+          }
+        } else if (line.trim().startsWith('{')) {
+          // Direct JSON format (likely error event)
+          try {
+            const data = JSON.parse(line.trim());
+
+            // Handle error event
+            if (data.event === 'error') {
+              const errorMessage = data.message || 'An error occurred while processing your request.';
+              const error = new Error(errorMessage);
+              error.code = data.code;
+              error.status = data.status;
+              onError?.(error);
+              return; // Exit early on error
+            }
+
+            // Extract answer from direct JSON
+            if (data.answer) {
+              appendAnswerChunk(data.answer);
+            }
+
+            // Extract conversation_id if present
+            if (data.conversation_id) {
+              newConversationId = data.conversation_id;
+            }
+          } catch (e) {
+            // Not JSON, treat as plain text
+            appendAnswerChunk(line);
+          }
+        } else {
+          // Plain text line (shouldn't happen, but handle it)
+          appendAnswerChunk(line);
+        }
+      }
+    }
+
+    onComplete?.(fullAnswer || "I'm sorry, I didn't receive a valid response. Please try again.", newConversationId);
+  } catch (error) {
+    console.error('Assistant Prompt API call failed:', error);
     onError?.(error);
   }
 }

@@ -10,7 +10,7 @@ import { MorningBriefing } from './components/briefing/MorningBriefing';
 import { MusicChat } from './components/chat/MusicChat';
 import { History } from './components/history/History';
 import { AssistantPromptChat } from './components/briefing/AssistantPromptChat';
-import { sendChatMessageStream } from './lib/chatService';
+import { sendChatMessageStream, sendAssistantPromptMessageStream } from './lib/chatService';
 import { getAgentInfo } from './lib/agentService';
 import { getRelatedQuestions } from './lib/relatedQuestionsService';
 import { updateMagnetZip } from './lib/locationService';
@@ -260,8 +260,12 @@ function App({ cId = '', sn = '', magnetContext = null }) {
       // 失败时不显示推荐问题（不设置默认值）
     });
 
+// 根据当前页面选择API
+    const isAssistantPromptChat = page === 'assistantPromptChat';
+    const chatApiFunction = isAssistantPromptChat ? sendAssistantPromptMessageStream : sendChatMessageStream;
+    
     // 调用 chat API
-    sendChatMessageStream(
+    chatApiFunction(
       query,
       cId,
       conversationId,
@@ -272,7 +276,11 @@ function App({ cId = '', sn = '', magnetContext = null }) {
       },
       // onComplete: 完成时保存最终答案和 conversation_id
       (finalAnswer, newConversationId, answerMethodFromAPI) => {
-        setConversationId(newConversationId);
+        // 只有在非Assistant Prompt页面时才更新conversationId
+        if (!isAssistantPromptChat) {
+          setConversationId(newConversationId);
+        }
+        
         setIsTyping(false);
         streamQueueRef.current = '';
         stopStreamTimer();
@@ -331,7 +339,7 @@ function App({ cId = '', sn = '', magnetContext = null }) {
               // 记录聊天日志（只在成功时记录）
               logChatMessage({
                 cId: cId,
-                conversationId: newConversationId,
+                conversationId: isAssistantPromptChat ? conversationId : newConversationId,
                 question: query,
                 answer: answerText,
                 answerMethod: normalizedAnswerMethod,
@@ -341,8 +349,8 @@ function App({ cId = '', sn = '', magnetContext = null }) {
               // 记录用户行为日志
               logUserAction({
                 cId: cId,
-                actionType: 'chat',
-                conversationId: newConversationId,
+                actionType: isAssistantPromptChat ? 'assistant_prompt_chat' : 'chat',
+                conversationId: isAssistantPromptChat ? conversationId : newConversationId,
                 questionText: query,
                 context: {
                   answerMethod: normalizedAnswerMethod,
@@ -358,7 +366,7 @@ function App({ cId = '', sn = '', magnetContext = null }) {
       },
       // onError: 错误处理
       (error) => {
-        console.error('Chat API 调用失败:', error);
+        console.error(`${isAssistantPromptChat ? 'Assistant Prompt' : 'Chat'} API 调用失败:`, error);
         setIsTyping(false);
         streamQueueRef.current = '';
         stopStreamTimer();
