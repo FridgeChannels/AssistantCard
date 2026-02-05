@@ -441,7 +441,7 @@ export function registerApiRoutes(app, supabase) {
         };
       }
 
-      setCacheSeconds(res, 60, 300);
+      setCacheSeconds(res, 10, 60);
       timing.setHeader(res);
       return res.json(payload);
     } catch (err) {

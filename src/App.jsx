@@ -9,6 +9,7 @@ import { StarterQuestions } from './components/chat/StarterQuestions';
 import { MorningBriefing } from './components/briefing/MorningBriefing';
 import { MusicChat } from './components/chat/MusicChat';
 import { History } from './components/history/History';
+import { AssistantPromptChat } from './components/briefing/AssistantPromptChat';
 import { sendChatMessageStream } from './lib/chatService';
 import { getAgentInfo } from './lib/agentService';
 import { getRelatedQuestions } from './lib/relatedQuestionsService';
@@ -40,7 +41,7 @@ function parseAnswerWithMethod(text) {
 }
 
 function App({ cId = '', sn = '', magnetContext = null }) {
-  const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'musicChat' | 'history'
+  const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'assistantPromptChat' | 'musicChat' | 'history'
   const [userRole, setUserRole] = useState('buyer'); // 'buyer' | 'seller' | null - 默认设为 buyer
   const [selectedLocation, setSelectedLocation] = useState(null); // Location selection for Morning Briefing
   const [chatHistory, setChatHistory] = useState([]); // Array of { question, answer }
@@ -176,6 +177,10 @@ function App({ cId = '', sn = '', magnetContext = null }) {
 
   const handleTalkToAssistant = () => {
     setPage('chat');
+  };
+
+  const handleOpenAssistantPromptChat = () => {
+    setPage('assistantPromptChat');
   };
 
   const handleNavigateToHistory = () => {
@@ -456,6 +461,7 @@ function App({ cId = '', sn = '', magnetContext = null }) {
             >
               <MorningBriefing
                 onTalkToAssistant={handleTalkToAssistant}
+                onOpenAssistantPromptChat={handleOpenAssistantPromptChat}
                 cId={cId}
                 sn={sn}
                 magnetContext={magnetContext}
@@ -508,6 +514,24 @@ function App({ cId = '', sn = '', magnetContext = null }) {
             >
               <History onBack={handleBackFromHistory} />
             </motion.div>
+          ) : page === 'assistantPromptChat' ? (
+            <AssistantPromptChat
+              chatHistory={chatHistory}
+              setChatHistory={setChatHistory}
+              isTyping={isTyping}
+              currentAnswer={currentAnswer}
+              handleSearch={handleSearch}
+              handleBackToBriefing={handleBackToBriefing}
+              agentInfo={agentInfo}
+              answerStartRef={answerStartRef}
+              messagesEndRef={messagesEndRef}
+              retryQuestion={retryQuestion}
+              starterQuestions={starterQuestions}
+              isLoadingStarterQuestions={isLoadingStarterQuestions}
+              conversationId={conversationId}
+              cId={cId}
+              hasInitialRecommendations={false} // 不显示初始推荐问题
+            />
           ) : (
             <motion.div
               key="chat"

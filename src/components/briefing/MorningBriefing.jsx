@@ -14,6 +14,12 @@ const CHAT_WITH_LEO_PERMISSIONS = [
     'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
     'METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE',
 ];
+// Assistant Prompt 按钮显示条件：需同时具备以下三个权限
+const ASSISTANT_PROMPT_PERMISSIONS = [
+    'MOD_MOD_ASSISTANT',
+    'FUNC_FUNC_ASSISTANT_CUSTOM_PROMT',
+    'METHOD_METHOD_ASSISTANT_CUSTOM_PROMT',
+];
 // chat_url 按钮显示条件：需同时具备以下三个权限
 const CHAT_URL_PERMISSIONS = [
     'MOD_MOD_ASSISTANT',
@@ -39,8 +45,25 @@ function hasAllPermissions(permissions = [], required = []) {
     return required.every((p) => set.has(p));
 }
 
+// 检查是否包含任何 Assistant 相关权限
+function hasAnyAssistantPermission(permissions = []) {
+    if (!Array.isArray(permissions)) return false;
+    const assistantPermissions = [
+        'MOD_MOD_ASSISTANT',
+        'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
+        'METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE',
+        'FUNC_FUNC_ASSISTANT_CHAT_URL',
+        'METHOD_METHOD_ASSISTANT_CHAT_URL',
+        'FUNC_FUNC_ASSISTANT_CUSTOM_PROMT',
+        'METHOD_METHOD_ASSISTANT_CUSTOM_PROMT'
+    ];
+    const permissionSet = new Set(permissions);
+    return assistantPermissions.some(p => permissionSet.has(p));
+}
+
 export function MorningBriefing({
     onTalkToAssistant,
+    onOpenAssistantPromptChat,
     cId = '',
     sn = '',
     magnetContext = null,
@@ -70,6 +93,7 @@ export function MorningBriefing({
     const audioRef = useRef(null); // 用于cleanup中访问audioElement
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
+    const [showContactOptions, setShowContactOptions] = useState(false);
 
     // 日期显示：
     // - 若播放内容包含 created_at（例如 tp/:id 使用 content_play 表），则用该时间
@@ -336,6 +360,37 @@ export function MorningBriefing({
         setShowOnboarding(false);
     };
 
+    // 处理联系选项
+    const handleContactButtonClick = (e) => {
+        e.preventDefault();
+        setShowContactOptions(true);
+    };
+
+    const handleContactOptionClick = (option) => {
+        if (cta && cta.phone) {
+            switch (option) {
+                case 'call':
+                    window.location.href = `tel:${cta.phone}`;
+                    break;
+                case 'sms':
+                    window.location.href = `sms:${cta.phone}`;
+                    break;
+                case 'email':
+                    if (cta.email) {
+                        window.location.href = `mailto:${cta.email}`;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        setShowContactOptions(false);
+    };
+
+    const closeContactOptions = () => {
+        setShowContactOptions(false);
+    };
+
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
             <AnimatePresence>
@@ -597,71 +652,111 @@ export function MorningBriefing({
                         >
                             {hasFullCta ? (
                                 <>
-                                    {/* 第1个：跳转站内 Chat 页面，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE、METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE 时显示 */}
-                                    {showChatWithLeo && (
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <button
-                                                type="button"
-                                                onClick={onTalkToAssistant}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                            >
-                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
-                                            </button>
-                                        </Glass>
-                                    )}
-                                    {/* 第2个：跳转第三方 URL（chat_url），仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CHAT_URL、METHOD_METHOD_ASSISTANT_CHAT_URL 时显示 */}
-                                    {showChatUrlButton && cta.chat_url && (
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
-                                                href={cta.chat_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                            >
-                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
-                                            </a>
-                                        </Glass>
-                                    )}
-                                    {/* 第3个：打电话，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 phone 不为空时显示 */}
-                                    {showCtaContactButton && cta.phone && (
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
-                                                href={`tel:${cta.phone}`}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                            >
-                                                <Phone className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Call'}</span>
-                                            </a>
-                                        </Glass>
-                                    )}
-                                    {/* 第4个：发短信，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 phone 不为空时显示 */}
-                                    {showCtaContactButton && cta.phone && (
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
-                                                href={`sms:${cta.phone}`}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                            >
-                                                <MessageSquare className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Text'}</span>
-                                            </a>
-                                        </Glass>
-                                    )}
-                                    {/* 第5个：发邮件，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 email 不为空时显示 */}
-                                    {showCtaContactButton && cta.email && (
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
-                                                href={`mailto:${cta.email}`}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                            >
-                                                <Mail className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Email'}</span>
-                                            </a>
-                                        </Glass>
-                                    )}
-                                    {/* 第6个：跳转 skip_url，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_SKIP 且 skip_url 不为空时显示 */}
-                                    {showSkipUrlButton && cta.skip_url && (
+                                    {/* 按钮优先级：Assistant > Contact > Skip URL */}
+                                    {/* 检查是否有任何 Assistant 相关权限 - 最高优先级 */}
+                                    {hasAnyAssistantPermission(permissions) ? (
+                                        <>
+                                            {/* Assistant 类型按钮优先显示 */}
+                                            {/* 第1个：跳转站内 Chat 页面，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE、METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE 时显示 */}
+                                            {showChatWithLeo && (
+                                                <Glass variant="card" className="px-6 py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={onTalkToAssistant}
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
+                                                    </button>
+                                                </Glass>
+                                            )}
+                                            {/* 第2个：Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {!showChatWithLeo && hasAllPermissions(permissions, ASSISTANT_PROMPT_PERMISSIONS) && (
+                                                <Glass variant="card" className="px-6 py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={onOpenAssistantPromptChat}
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">Assistant Prompt</span>
+                                                    </button>
+                                                </Glass>
+                                            )}
+                                            {/* 第3个：跳转第三方 URL（chat_url），仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CHAT_URL、METHOD_METHOD_ASSISTANT_CHAT_URL 时显示 */}
+                                            {showChatUrlButton && cta.chat_url && (
+                                                <Glass variant="card" className="px-6 py-4">
+                                                    <a
+                                                        href={cta.chat_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
+                                                    </a>
+                                                </Glass>
+                                            )}
+                                        </>
+                                    ) : showCtaContactButton && (cta.phone || cta.email) ? (
+                                        // 如果没有 Assistant 权限但有 Contact 权限，则显示 Contact 按钮 - 中等优先级
+                                        <>
+                                            <Glass variant="card" className="px-6 py-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleContactButtonClick}
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                >
+                                                    <Phone className="w-5 h-5 text-[#010101]" />
+                                                    <span className="text-base font-medium text-[#010101]">{cta.name || 'Contact'}</span>
+                                                </button>
+                                            </Glass>
+                                            {/* 联系选项弹窗 */}
+                                            {showContactOptions && (
+                                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                                    <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+                                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Contact Options</h3>
+                                                        <div className="space-y-3">
+                                                            {cta.phone && (
+                                                                <button
+                                                                    onClick={() => handleContactOptionClick('call')}
+                                                                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                                >
+                                                                    <Phone className="w-5 h-5 text-blue-600" />
+                                                                    <span className="text-gray-800">Call {cta.phone}</span>
+                                                                </button>
+                                                            )}
+                                                            {cta.phone && (
+                                                                <button
+                                                                    onClick={() => handleContactOptionClick('sms')}
+                                                                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                                >
+                                                                    <MessageSquare className="w-5 h-5 text-green-600" />
+                                                                    <span className="text-gray-800">Text {cta.phone}</span>
+                                                                </button>
+                                                            )}
+                                                            {cta.email && (
+                                                                <button
+                                                                    onClick={() => handleContactOptionClick('email')}
+                                                                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                                >
+                                                                    <Mail className="w-5 h-5 text-purple-600" />
+                                                                    <span className="text-gray-800">Email {cta.email}</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={closeContactOptions}
+                                                            className="w-full mt-4 px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-gray-800"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : showSkipUrlButton && cta.skip_url ? (
+                                        // 如果没有 Assistant 和 Contact 权限，但有 Skip 权限，则显示 Skip 按钮 - 最低优先级
                                         <Glass variant="card" className="px-6 py-4">
                                             <a
                                                 href={cta.skip_url}
@@ -673,31 +768,147 @@ export function MorningBriefing({
                                                 <span className="text-base font-medium text-[#010101]">{cta.name || 'Link'}</span>
                                             </a>
                                         </Glass>
-                                    )}
+                                    ) : null}
                                 </>
                             ) : (
-                                <Glass variant="card" className="px-6 py-4">
-                                    {ctaLink ? (
-                                        <a
-                                            href={ctaLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                        >
-                                            <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                            <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
-                                        </a>
+                                <>
+                                    {/* 对于没有完整 CTA 的情况，按优先级显示按钮：Assistant > Contact > Skip */}
+                                    {hasAnyAssistantPermission(permissions) ? (
+                                        // 最高优先级：Assistant
+                                        <>
+                                            <Glass variant="card" className="px-6 py-4">
+                                                {ctaLink ? (
+                                                    <a
+                                                        href={ctaLink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                    </a>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={onTalkToAssistant}
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                    </button>
+                                                )}
+                                            </Glass>
+                                            {/* Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {!ctaLink && !ctaTextOverride && hasAllPermissions(permissions, ASSISTANT_PROMPT_PERMISSIONS) && (
+                                                <Glass variant="card" className="px-6 py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={onOpenAssistantPromptChat}
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    >
+                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                        <span className="text-base font-medium text-[#010101]">Assistant Prompt</span>
+                                                    </button>
+                                                </Glass>
+                                            )}
+                                        </>
+                                    ) : showCtaContactButton && (cta?.phone || cta?.email) ? (
+                                        // 中等优先级：Contact
+                                        <>
+                                            <Glass variant="card" className="px-6 py-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleContactButtonClick}
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                >
+                                                    <Phone className="w-5 h-5 text-[#010101]" />
+                                                    <span className="text-base font-medium text-[#010101]">{cta?.name || 'Contact'}</span>
+                                                </button>
+                                            </Glass>
+                                            {/* 联系选项弹窗 */}
+                                            {showContactOptions && (
+                                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                                    <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+                                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Contact Options</h3>
+                                                        <div className="space-y-3">
+                                                            {cta?.phone && (
+                                                            <button
+                                                                onClick={() => handleContactOptionClick('call')}
+                                                                className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                            >
+                                                                <Phone className="w-5 h-5 text-blue-600" />
+                                                                <span className="text-gray-800">Call {cta.phone}</span>
+                                                            </button>
+                                                        )}
+                                                        {cta?.phone && (
+                                                            <button
+                                                                onClick={() => handleContactOptionClick('sms')}
+                                                                className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                            >
+                                                                <MessageSquare className="w-5 h-5 text-green-600" />
+                                                                <span className="text-gray-800">Text {cta.phone}</span>
+                                                            </button>
+                                                        )}
+                                                        {cta?.email && (
+                                                            <button
+                                                                onClick={() => handleContactOptionClick('email')}
+                                                                className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-3"
+                                                            >
+                                                                <Mail className="w-5 h-5 text-purple-600" />
+                                                                <span className="text-gray-800">Email {cta.email}</span>
+                                                            </button>
+                                                        )}
+                                                        </div>
+                                                        <button
+                                                            onClick={closeContactOptions}
+                                                            className="w-full mt-4 px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : showSkipUrlButton && cta?.skip_url ? (
+                                        // 最低优先级：Skip
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={cta.skip_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta?.name || 'Link'}</span>
+                                            </a>
+                                        </Glass>
+                                    ) : ctaLink ? (
+                                        // 如果以上权限都没有，但有链接，则显示链接
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={ctaLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                            </a>
+                                        </Glass>
                                     ) : (
-                                        <button
-                                            type="button"
-                                            onClick={onTalkToAssistant}
-                                            className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                        >
-                                            <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                            <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
-                                        </button>
+                                        // 最后备选：Talk to Assistant
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <button
+                                                type="button"
+                                                onClick={onTalkToAssistant}
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                            </button>
+                                        </Glass>
                                     )}
-                                </Glass>
+                                </>
                             )}
                         </motion.div>
                     )}
