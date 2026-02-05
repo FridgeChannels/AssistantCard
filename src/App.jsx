@@ -39,7 +39,7 @@ function parseAnswerWithMethod(text) {
   return { text, answerMethod: null };
 }
 
-function App({ cId = '' }) {
+function App({ cId = '', sn = '', magnetContext = null }) {
   const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'musicChat' | 'history'
   const [userRole, setUserRole] = useState('buyer'); // 'buyer' | 'seller' | null - 默认设为 buyer
   const [selectedLocation, setSelectedLocation] = useState(null); // Location selection for Morning Briefing
@@ -448,6 +448,8 @@ function App({ cId = '' }) {
               <MorningBriefing
                 onTalkToAssistant={handleTalkToAssistant}
                 cId={cId}
+                sn={sn}
+                magnetContext={magnetContext}
                 hasPreloaded={hasPreloadedQuestionsRef.current}
                 cachedPlayContent={playContentCacheRef.current}
                 isLoadingPlayContent={isLoadingPlayContentRef.current}

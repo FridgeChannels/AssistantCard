@@ -255,7 +255,7 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
-  // 根据 SN 获取 magnet.id
+  // 根据 SN 获取 magnet.id 及 solution 信息（route、id、permissions）
   app.get('/api/magnets/by-sn/:sn', async (req, res) => {
     const { sn } = req.params;
 
@@ -264,9 +264,9 @@ export function registerApiRoutes(app, supabase) {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data: magnetRow, error } = await supabase
         .from('magnet')
-        .select('id')
+        .select('id, magnet_config_id, magnet_config_cta_id')
         .eq('sn', sn)
         .maybeSingle();
 
@@ -275,11 +275,116 @@ export function registerApiRoutes(app, supabase) {
         return res.status(500).json({ error: 'Failed to query magnet' });
       }
 
-      if (!data) {
+      if (!magnetRow) {
         return res.status(404).json({ error: 'Magnet not found' });
       }
 
-      return res.json({ id: data.id });
+      const payload = { id: magnetRow.id };
+
+      // 根据 magnet.magnet_config_cta_id 查询 magnet_config_cta 表，返回 CTA 信息（含 chat_url、skip_url）
+      if (magnetRow.magnet_config_cta_id) {
+        const { data: ctaRows, error: ctaError } = await supabase
+          .from('magnet_config_cta')
+          .select('id, phone, email, name, skip_url, chat_url')
+          .eq('id', magnetRow.magnet_config_cta_id);
+        if (!ctaError && ctaRows?.length > 0) {
+          const cta = ctaRows[0];
+          const chatUrl = cta.chat_url ?? cta.chatUrl ?? cta['chat-url'] ?? null;
+          payload.cta = {
+            phone: cta.phone ?? '',
+            email: cta.email ?? '',
+            name: cta.name ?? 'James',
+            skip_url: cta.skip_url ?? null,
+            chat_url: chatUrl,
+          };
+        }
+      }
+
+      // 通过 magnet_config 获取 industry_solution，再组装 solution
+      const magnetConfigId = magnetRow.magnet_config_id;
+      if (magnetConfigId) {
+        const { data: configRow } = await supabase
+          .from('magnet_config')
+          .select('industry_solution_id')
+          .eq('id', magnetConfigId)
+          .maybeSingle();
+
+        const industrySolutionId = configRow?.industry_solution_id;
+        if (industrySolutionId) {
+          const { data: solutionRow } = await supabase
+            .from('industry_solution')
+            .select('id, studio_entry_route')
+            .eq('id', industrySolutionId)
+            .maybeSingle();
+
+          if (solutionRow) {
+            const route = (solutionRow.studio_entry_route || '')
+              .replace(/^\/studio\/?/, '')
+              .replace(/\/$/, '') || null;
+
+            const { data: configList } = await supabase
+              .from('industry_solution_config')
+              .select(`
+                module_id,
+                function_id,
+                method_id,
+                solution_module:module_id(code),
+                solution_function:function_id(code),
+                solution_method:method_id(code)
+              `)
+              .eq('industry_solution_id', industrySolutionId)
+              .order('sort_order');
+
+            const permSet = new Set();
+            (configList || []).forEach((row) => {
+              const mod = row.solution_module?.code;
+              const fn = row.solution_function?.code;
+              const method = row.solution_method?.code;
+              const toKey = (s) => (s || '').toUpperCase().replace(/-/g, '_');
+              if (mod) permSet.add('MOD_' + toKey(mod));
+              if (fn) permSet.add('FUNC_' + toKey(fn));
+              if (method) permSet.add('METHOD_' + toKey(method));
+            });
+
+            payload.solution = {
+              route: route ?? 'real-estate',
+              id: String(solutionRow.id),
+              permissions: [...permSet].sort(),
+            };
+          }
+        }
+      }
+
+      if (!payload.solution) {
+        payload.solution = {
+          route: 'real-estate',
+          id: '1',
+          permissions: [
+            'MOD_GLANCE_DESIGN',
+            'FUNC_GLANCE_DESIGN',
+            'METHOD_GLANCE_DESIGN',
+            'MOD_ASSISTANT',
+            'FUNC_ASSISTANT_FC_CUSTOM_MADE',
+            'METHOD_ASSISTANT_FC_CUSTOM_MADE',
+            'MOD_CTA',
+            'FUNC_CTA_ROUTE',
+            'METHOD_CTA_CONTACT',
+            'MOD_PLAY_CONTENT',
+            'FUNC_PLAY_CONTENT_FC',
+            'METHOD_PLAY_CONTENT_FC',
+            'METHOD_CTA_SKIP',
+            'FUNC_PLAY_CONTENT_CUSTOM',
+            'METHOD_PLAY_CONTENT_CUSTOM_TEXT',
+            'METHOD_PLAY_CONTENT_CUSTOM_RSS',
+            'FUNC_ASSISTANT_CHAT_URL',
+            'METHOD_ASSISTANT_CHAT_URL',
+            'FUNC_ASSISTANT_CUSTOM_PROMT',
+            'METHOD_ASSISTANT_CUSTOM_PROMT',
+          ],
+        };
+      }
+
+      return res.json(payload);
     } catch (err) {
       console.error('Unexpected error in /api/magnets/by-sn:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -371,34 +476,74 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
-  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先）
+  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先；按 magnet→magnet_config.industry_solution_id 限定行业）
+  // 通过 URL 中的 sn（如 /p/N819HqJYQ123）定位 magnet：请求使用 ?sn=xxx，后端用 sn 查 magnet 得到 zip_code、industry_solution_id
   app.get('/api/play-contents/today', async (req, res) => {
-    const { magnetId } = req.query;
+    const { sn, magnetId: magnetIdQuery } = req.query;
 
     try {
+      let resolvedMagnetId = null;
       let zipCode = null;
-      if (magnetId) {
+      let industrySolutionId = null;
+
+      if (sn) {
         const { data: magnet, error: magnetErr } = await supabase
           .from('magnet')
-          .select('zip_code')
-          .eq('id', magnetId)
+          .select('id, zip_code, magnet_config_id')
+          .eq('sn', sn)
           .maybeSingle();
-        if (!magnetErr && magnet?.zip_code) zipCode = magnet.zip_code;
+        if (!magnetErr && magnet) {
+          resolvedMagnetId = magnet.id;
+          if (magnet.zip_code) zipCode = magnet.zip_code;
+          if (magnet.magnet_config_id) {
+            const { data: config, error: configErr } = await supabase
+              .from('magnet_config')
+              .select('industry_solution_id')
+              .eq('id', magnet.magnet_config_id)
+              .maybeSingle();
+            if (!configErr && config?.industry_solution_id != null) {
+              industrySolutionId = config.industry_solution_id;
+            }
+          }
+        }
+      } else if (magnetIdQuery) {
+        resolvedMagnetId = magnetIdQuery;
+        const { data: magnet, error: magnetErr } = await supabase
+          .from('magnet')
+          .select('zip_code, magnet_config_id')
+          .eq('id', magnetIdQuery)
+          .maybeSingle();
+        if (!magnetErr && magnet) {
+          if (magnet.zip_code) zipCode = magnet.zip_code;
+          if (magnet.magnet_config_id) {
+            const { data: config, error: configErr } = await supabase
+              .from('magnet_config')
+              .select('industry_solution_id')
+              .eq('id', magnet.magnet_config_id)
+              .maybeSingle();
+            if (!configErr && config?.industry_solution_id != null) {
+              industrySolutionId = config.industry_solution_id;
+            }
+          }
+        }
       }
 
       const selectCols = 'id, headline, audio_url';
       const orderOpt = { ascending: false };
 
       const hasZipCode = !!zipCode;
-      const locationFormatted = magnetId && zipCode ? (await supabase.from('magnet').select('formatted').eq('id', magnetId).maybeSingle()).data?.formatted : null;
+      const locationFormatted = resolvedMagnetId && zipCode ? (await supabase.from('magnet').select('formatted').eq('id', resolvedMagnetId).maybeSingle()).data?.formatted : null;
+
+      console.log('[play-contents] 请求参数:', { sn: sn ?? null, resolvedMagnetId, zipCode, industrySolutionId, hasZipCode });
 
       if (zipCode) {
-        const { data: byZip, error: zipErr } = await supabase
-          .from('play_news_contents')
-          .select(selectCols)
-          .eq('zip_code', zipCode)
-          .order('created_at', orderOpt)
-          .limit(1);
+        let byZipQuery = supabase.from('play_news_contents').select(selectCols).eq('zip_code', zipCode);
+        if (industrySolutionId != null) {
+          byZipQuery = byZipQuery.eq('industry_solution_id', industrySolutionId);
+        }
+        console.log('[play-contents] 查询1 条件: zip_code=%s, industry_solution_id=%s', zipCode, industrySolutionId ?? '(未设置)');
+        const { data: byZip, error: zipErr } = await byZipQuery.order('created_at', orderOpt).limit(1);
+        console.log('[play-contents] 查询1 结果: 条数=%s, error=%s', byZip?.length ?? 0, zipErr ? JSON.stringify(zipErr) : null);
 
         if (!zipErr && byZip?.length > 0) {
           return res.json({
@@ -410,13 +555,13 @@ export function registerApiRoutes(app, supabase) {
         }
       }
 
-      const { data: latest, error: latestErr } = await supabase
-        .from('play_news_contents')
-        .select(selectCols)
-        .order('created_at', orderOpt)
-        .limit(1);
-
-      console.log('[play-contents] latest content:', latest[0]);
+      let latestQuery = supabase.from('play_news_contents').select(selectCols);
+      if (industrySolutionId != null) {
+        latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
+      }
+      console.log('[play-contents] 查询2 条件: industry_solution_id=%s', industrySolutionId ?? '(未设置)');
+      const { data: latest, error: latestErr } = await latestQuery.order('created_at', orderOpt).limit(1);
+      console.log('[play-contents] 查询2 结果: 条数=%s, error=%s, 首条=%s', latest?.length ?? 0, latestErr ? JSON.stringify(latestErr) : null, latest?.[0] ?? null);
       if (latestErr) {
         console.error('Error querying play_news_contents:', latestErr);
         return res.status(500).json({ error: 'Failed to query play_news_contents' });

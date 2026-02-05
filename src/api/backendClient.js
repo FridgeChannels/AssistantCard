@@ -45,21 +45,30 @@ async function request(path, options = {}) {
 
 // --------- Magnet & Agent ---------
 
-export async function apiGetMagnetIdBySn(sn) {
+/**
+ * 根据 sn 获取完整 magnet 信息（id、solution、cta）
+ * @returns {Promise<{ id, solution?, cta? }|null>}
+ */
+export async function apiGetMagnetBySn(sn) {
   if (!sn) return null;
 
   try {
     const data = await request(`/api/magnets/by-sn/${encodeURIComponent(sn)}`, {
       method: 'GET',
     });
-    return data?.id ?? null;
+    return data ?? null;
   } catch (error) {
     if (error.status === 404) {
       return null;
     }
-    console.error('apiGetMagnetIdBySn failed:', error);
+    console.error('apiGetMagnetBySn failed:', error);
     throw error;
   }
+}
+
+export async function apiGetMagnetIdBySn(sn) {
+  const data = await apiGetMagnetBySn(sn);
+  return data?.id ?? null;
 }
 
 export async function apiGetMagnetStage(magnetId) {
@@ -120,8 +129,16 @@ export async function apiGetContentPlayById(id) {
 
 // --------- Play contents ---------
 
-export async function apiGetTodayPlayContent(magnetId = null) {
-  const query = magnetId ? `?magnetId=${encodeURIComponent(magnetId)}` : '';
+/**
+ * 获取今日播放内容。优先用 URL 中的 sn（/p/:sn）定位 magnet，无 sn 时可用 magnetId（如 /tp/:id 场景）。
+ * @param {{ sn?: string | null, magnetId?: string | null }} opts - sn 来自路由 /p/:sn，magnetId 为 magnet 表 id
+ */
+export async function apiGetTodayPlayContent(opts = {}) {
+  const { sn = null, magnetId = null } = typeof opts === 'object' && opts !== null ? opts : { magnetId: opts };
+  const params = new URLSearchParams();
+  if (sn) params.set('sn', sn);
+  else if (magnetId) params.set('magnetId', String(magnetId));
+  const query = params.toString() ? `?${params.toString()}` : '';
 
   try {
     const data = await request(`/api/play-contents/today${query}`, {

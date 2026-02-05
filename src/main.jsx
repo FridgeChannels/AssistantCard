@@ -4,46 +4,50 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import TpPage from './pages/TpPage.jsx'
-import { getMagnetIdBySn } from './lib/magnetIdService.js'
+import { getMagnetBySn } from './lib/magnetIdService.js'
 import { apiGetContentPlayById } from './api/backendClient.js'
 import { MobileContainer } from './components/layout/MobileContainer.jsx'
 
-// 包装组件：从路由中读取 sn，通过接口换取 magnet_id 并在全局缓存
+// 包装组件：从路由中读取 sn，通过接口换取 magnet 信息（id、solution、cta）并在全局缓存
 function AppWithRouter() {
   const { sn } = useParams()
   const [magnetId, setMagnetId] = useState('')
+  const [magnetContext, setMagnetContext] = useState(null)
 
   useEffect(() => {
     let cancelled = false
 
-    async function resolveMagnetId() {
+    async function resolveMagnet() {
       if (!sn) {
         setMagnetId('')
+        setMagnetContext(null)
         return
       }
 
       try {
-        const id = await getMagnetIdBySn(sn)
+        const data = await getMagnetBySn(sn)
         if (!cancelled) {
-          setMagnetId(id || '')
+          setMagnetId(data?.id ?? '')
+          setMagnetContext(data ? { solution: data.solution, cta: data.cta } : null)
         }
       } catch (e) {
-        console.error('根据 SN 获取 magnet_id 失败:', e)
+        console.error('根据 SN 获取 magnet 信息失败:', e)
         if (!cancelled) {
           setMagnetId('')
+          setMagnetContext(null)
         }
       }
     }
 
-    resolveMagnetId()
+    resolveMagnet()
 
     return () => {
       cancelled = true
     }
   }, [sn])
 
-  // 这里向下传递的 cId 已经是 magnet 表中的 id（magnet_id）
-  return <App cId={magnetId || ''} />
+  // cId 为 magnet 表 id；sn 为 URL 路径值；magnetContext 含 solution、cta，供 Play Content 下 CTA 按钮等使用
+  return <App cId={magnetId || ''} sn={sn || ''} magnetContext={magnetContext} />
 }
 
 // /tp/:id 路由：id 为 content_play 表主键，解析出 magnetId 后渲染独立页面

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon } from 'lucide-react';
+import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon, Phone, Mail, MessageSquare } from 'lucide-react';
 import { getTodayPlayContent } from '../../lib/playContentService';
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
@@ -8,9 +8,42 @@ import { Glass } from '../layout/Glass';
 import { LocationSelector } from './LocationSelector';
 import { ZipCodeOnboarding } from './ZipCodeOnboarding';
 
+// Chat with Leo 按钮显示条件：需同时具备以下三个权限
+const CHAT_WITH_LEO_PERMISSIONS = [
+    'MOD_MOD_ASSISTANT',
+    'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
+    'METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE',
+];
+// chat_url 按钮显示条件：需同时具备以下三个权限
+const CHAT_URL_PERMISSIONS = [
+    'MOD_MOD_ASSISTANT',
+    'FUNC_FUNC_ASSISTANT_CHAT_URL',
+    'METHOD_METHOD_ASSISTANT_CHAT_URL',
+];
+// skip_url 按钮显示条件：需同时具备以下三个权限，且 skip_url 不为空
+const SKIP_URL_PERMISSIONS = [
+    'MOD_MOD_CTA',
+    'FUNC_FUNC_CTA_ROUTE',
+    'METHOD_METHOD_CTA_SKIP',
+];
+// phone、SMS、email 按钮显示条件：需同时具备以下三个权限，且对应字段值不为空
+const CTA_CONTACT_PERMISSIONS = [
+    'MOD_MOD_CTA',
+    'FUNC_FUNC_CTA_ROUTE',
+    'METHOD_METHOD_CTA_CONTACT',
+];
+
+function hasAllPermissions(permissions = [], required = []) {
+    if (!Array.isArray(permissions) || required.length === 0) return false;
+    const set = new Set(permissions);
+    return required.every((p) => set.has(p));
+}
+
 export function MorningBriefing({
     onTalkToAssistant,
     cId = '',
+    sn = '',
+    magnetContext = null,
     hasPreloaded = false,
     onQuestionsPreloaded,
     cachedPlayContent = null,
@@ -175,8 +208,8 @@ export function MorningBriefing({
                     onPlayContentLoadingChange(true);
                 }
 
-                // Fetch play content (magnetId = cId：有 zip_code 时按 zip 优先，否则取最新)
-                const content = await getTodayPlayContent(cId || null);
+                // Fetch play content：根据 URL 的 sn（/p/:sn）定位 magnet，无 sn 时用 cId（magnet id）
+                const content = await getTodayPlayContent(sn ? { sn } : { magnetId: cId || null });
 
                 if (!content) {
                     setError('No content available at the moment');
@@ -275,6 +308,22 @@ export function MorningBriefing({
 
     // Display title: use title field
     const displayTitle = playContent?.title || 'Daily Briefing';
+
+    // 底部 CTA：有 magnetContext.cta 时展示多按钮；仅 ctaTextOverride/ctaLink 时（如 TpPage）展示单按钮
+    const cta = magnetContext?.cta;
+    const hasFullCta = cta && (cta.name != null || cta.phone || cta.email || cta.chat_url || cta.skip_url);
+    const permissions = magnetContext?.solution?.permissions ?? [];
+    const showChatWithLeo = hasAllPermissions(permissions, CHAT_WITH_LEO_PERMISSIONS);
+    const showChatUrlButton = hasAllPermissions(permissions, CHAT_URL_PERMISSIONS);
+    
+    // 权限冲突检测：当 FUNC_FUNC_CTA_ROUTE 与 ASSISTANT 相关权限同时存在时，优先显示 ASSISTANT 按钮，隐藏 CTA 按钮
+    const hasCtaRoute = permissions.includes('FUNC_FUNC_CTA_ROUTE');
+    const hasAssistantCustomMade = permissions.includes('FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE');
+    const hasAssistantChatUrl = permissions.includes('FUNC_FUNC_ASSISTANT_CHAT_URL');
+    const hasConflict = hasCtaRoute && (hasAssistantCustomMade || hasAssistantChatUrl);
+    
+    const showSkipUrlButton = hasConflict ? false : hasAllPermissions(permissions, SKIP_URL_PERMISSIONS);
+    const showCtaContactButton = hasConflict ? false : hasAllPermissions(permissions, CTA_CONTACT_PERMISSIONS);
 
     const handleOnboardingSkip = () => {
         localStorage.setItem('zip_onboarding_skipped', 'true');
@@ -538,39 +587,118 @@ export function MorningBriefing({
                         )
                     )}
 
-                    {/* Talk to Assistant / CTA Button */}
+                    {/* 底部 CTA 按钮区：第1 站内 Chat / 第2 第三方 chat_url / 第3 打电话 / 第4 发短信 / 第5 发邮件 / 第6 skip_url */}
                     {!showOnboarding && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.2 }}
-                            className="w-full max-w-md mt-24"
+                            className="w-full max-w-md mt-24 space-y-3"
                         >
-                            <Glass variant="card" className="px-6 py-4">
-                                {ctaLink ? (
-                                    <a
-                                        href={ctaLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                    >
-                                        <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                        <span className="text-base font-medium text-[#010101]">
-                                            {ctaTextOverride || 'Chat with Leo'}
-                                        </span>
-                                    </a>
-                                ) : (
-                                    <button
-                                        onClick={onTalkToAssistant}
-                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-                                    >
-                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                        <span className="text-base font-medium text-[#010101]">
-                                            {ctaTextOverride || 'Chat with Leo'}
-                                        </span>
-                                    </button>
-                                )}
-                            </Glass>
+                            {hasFullCta ? (
+                                <>
+                                    {/* 第1个：跳转站内 Chat 页面，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE、METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE 时显示 */}
+                                    {showChatWithLeo && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <button
+                                                type="button"
+                                                onClick={onTalkToAssistant}
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
+                                            </button>
+                                        </Glass>
+                                    )}
+                                    {/* 第2个：跳转第三方 URL（chat_url），仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CHAT_URL、METHOD_METHOD_ASSISTANT_CHAT_URL 时显示 */}
+                                    {showChatUrlButton && cta.chat_url && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={cta.chat_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
+                                            </a>
+                                        </Glass>
+                                    )}
+                                    {/* 第3个：打电话，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 phone 不为空时显示 */}
+                                    {showCtaContactButton && cta.phone && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={`tel:${cta.phone}`}
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <Phone className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Call'}</span>
+                                            </a>
+                                        </Glass>
+                                    )}
+                                    {/* 第4个：发短信，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 phone 不为空时显示 */}
+                                    {showCtaContactButton && cta.phone && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={`sms:${cta.phone}`}
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <MessageSquare className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Text'}</span>
+                                            </a>
+                                        </Glass>
+                                    )}
+                                    {/* 第5个：发邮件，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_CONTACT 且 email 不为空时显示 */}
+                                    {showCtaContactButton && cta.email && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={`mailto:${cta.email}`}
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <Mail className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Email'}</span>
+                                            </a>
+                                        </Glass>
+                                    )}
+                                    {/* 第6个：跳转 skip_url，仅当具备 MOD_MOD_CTA、FUNC_FUNC_CTA_ROUTE、METHOD_METHOD_CTA_SKIP 且 skip_url 不为空时显示 */}
+                                    {showSkipUrlButton && cta.skip_url && (
+                                        <Glass variant="card" className="px-6 py-4">
+                                            <a
+                                                href={cta.skip_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                            >
+                                                <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Link'}</span>
+                                            </a>
+                                        </Glass>
+                                    )}
+                                </>
+                            ) : (
+                                <Glass variant="card" className="px-6 py-4">
+                                    {ctaLink ? (
+                                        <a
+                                            href={ctaLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                        >
+                                            <LinkIcon className="w-5 h-5 text-[#010101]" />
+                                            <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                        </a>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={onTalkToAssistant}
+                                            className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                        >
+                                            <MessageCircle className="w-5 h-5 text-[#010101]" />
+                                            <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                        </button>
+                                    )}
+                                </Glass>
+                            )}
                         </motion.div>
                     )}
                 </div>
