@@ -152,6 +152,29 @@ export async function apiGetTodayPlayContent(opts = {}) {
   }
 }
 
+/**
+ * 获取播放内容列表（三种规则：long_text_sequential / rss / latest）
+ * @param {{ sn?: string | null, magnetId?: string | null }} opts
+ * @returns {Promise<{ playback_rule: string, items: Array<{ id, title, audio_url }>, config_id?: number, hasZipCode?: boolean, locationFormatted?: string | null } | null>}
+ */
+export async function apiGetPlayContentList(opts = {}) {
+  const { sn = null, magnetId = null } = typeof opts === 'object' && opts !== null ? opts : { magnetId: opts };
+  const params = new URLSearchParams();
+  if (sn) params.set('sn', sn);
+  else if (magnetId) params.set('magnetId', String(magnetId));
+  const query = params.toString() ? `?${params.toString()}` : '';
+
+  try {
+    const data = await request(`/api/play-content/list${query}`, {
+      method: 'GET',
+    });
+    return data ?? null;
+  } catch (error) {
+    console.error('apiGetPlayContentList failed:', error);
+    return null;
+  }
+}
+
 // --------- Logging ---------
 
 export async function apiLogUserAction(payload) {

@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon, Phone, Mail, MessageSquare } from 'lucide-react';
-import { getTodayPlayContent } from '../../lib/playContentService';
+import { getPlayContentList } from '../../lib/playContentService';
+
+/** localStorage key for Long Text 当前索引。优先用 sn（URL 稳定），否则 cId，保证首次与再次进入 key 一致 */
+const PLAY_INDEX_KEY_PREFIX = 'play_content_index_';
+function playIndexStorageKey(snOrCId, configId) {
+    const id = snOrCId != null && snOrCId !== '' ? String(snOrCId) : null;
+    if (id == null || configId == null) return null;
+    return `${PLAY_INDEX_KEY_PREFIX}${id}_${configId}`;
+}
 import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 import { Glass } from '../layout/Glass';
@@ -83,14 +91,15 @@ export function MorningBriefing({
     initialLocation = null,
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
-    // Use cachedPlayContent if available, otherwise construct initial using initialLocation if available
+    // Initial playContent: list-response cache is hydrated in effect; single-item/legacy cache used as-is
     const [playContent, setPlayContent] = useState(() => {
-        if (cachedPlayContent) return cachedPlayContent;
+        if (cachedPlayContent && cachedPlayContent.playback_rule == null && cachedPlayContent.id != null) {
+            return cachedPlayContent;
+        }
         if (initialLocation && initialLocation.formatted) {
             return {
                 locationFormatted: initialLocation.formatted,
                 hasZipCode: !!initialLocation.zipCode,
-                // Other fields will be populated when fetch completes
             };
         }
         return null;
@@ -142,56 +151,103 @@ export function MorningBriefing({
         });
     }, [cId, hasPreloaded, onQuestionsPreloaded, disableRelatedQuestions]);
 
-    // 如果有缓存的播放内容，直接使用（优先使用缓存）
+    // 如果有缓存的播放内容，直接使用（支持 list 响应与旧单条缓存）
     useEffect(() => {
-        if (cachedPlayContent) {
-            setPlayContent(cachedPlayContent);
+        if (!cachedPlayContent) return;
+
+        const rule = cachedPlayContent.playback_rule;
+        const items = cachedPlayContent.items;
+        const hasZipCode = cachedPlayContent.hasZipCode;
+        const locationFormatted = cachedPlayContent.locationFormatted ?? null;
+
+        const applyItem = (item, audioUrl, onEnded) => {
+            if (!item) return;
+            const current = {
+                ...item,
+                ...(hasZipCode != null && { hasZipCode }),
+                ...(locationFormatted != null && { locationFormatted }),
+            };
+            setPlayContent(current);
             setIsLoading(false);
-            hasLoadedPlayContent.current = true; // 标记已加载，避免重复请求
+            hasLoadedPlayContent.current = true;
 
-            // 创建音频元素（如果还没有）
-            if (cachedPlayContent.audio_url) {
-                // 使用函数式更新来避免依赖 audioElement
+            if (audioUrl) {
                 setAudioElement(prev => {
-                    if (prev) {
-                        return prev; // 如果已经存在，不重复创建
-                    }
-                    const audio = new Audio(cachedPlayContent.audio_url);
-
-                    // 恢复播放进度
+                    if (prev) return prev;
+                    const audio = new Audio(audioUrl);
                     if (cachedPlayContent.savedCurrentTime) {
                         audio.currentTime = cachedPlayContent.savedCurrentTime;
                     }
-
                     audio.addEventListener('ended', async () => {
                         setIsPlaying(false);
-
-                        // 音频播放结束，更新播放日志
                         if (currentPlayLogId.current && playStartTime.current) {
                             const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
                             const totalDuration = audio.duration ? Math.floor(audio.duration) : null;
-
-                            await updatePlayContentLog(currentPlayLogId.current, {
-                                duration: duration,
-                                totalDuration: totalDuration,
-                            });
-
-                            // 重置
+                            await updatePlayContentLog(currentPlayLogId.current, { duration, totalDuration });
                             currentPlayLogId.current = null;
                             playStartTime.current = null;
                         }
+                        if (onEnded) onEnded();
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
-
-                    audioRef.current = audio; // 更新ref
+                    audioRef.current = audio;
                     return audio;
                 });
             }
+        };
+
+        if (rule === 'rss' || rule === 'latest') {
+            const item = items?.[0];
+            if (item) applyItem(item, item.audio_url, null);
+            return;
         }
-    }, [cachedPlayContent]); // 只依赖 cachedPlayContent
+
+        if (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) {
+            const key = playIndexStorageKey(sn || cId, cachedPlayContent.config_id);
+            if (!key) return;
+            const N = items.length;
+            let idx = parseInt(localStorage.getItem(key), 10);
+            if (Number.isNaN(idx) || idx >= N) idx = 0;
+            const item = items[idx];
+            applyItem(item, item?.audio_url, () => {
+                const current = parseInt(localStorage.getItem(key), 10);
+                const next = Number.isNaN(current) ? 0 : (current + 1) % N;
+                localStorage.setItem(key, String(next));
+            });
+            return;
+        }
+
+        // Legacy single-item cache (no playback_rule)
+        setPlayContent(cachedPlayContent);
+        setIsLoading(false);
+        hasLoadedPlayContent.current = true;
+        if (cachedPlayContent.audio_url) {
+            setAudioElement(prev => {
+                if (prev) return prev;
+                const audio = new Audio(cachedPlayContent.audio_url);
+                if (cachedPlayContent.savedCurrentTime) audio.currentTime = cachedPlayContent.savedCurrentTime;
+                audio.addEventListener('ended', async () => {
+                    setIsPlaying(false);
+                    if (currentPlayLogId.current && playStartTime.current) {
+                        const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
+                        const totalDuration = audio.duration ? Math.floor(audio.duration) : null;
+                        await updatePlayContentLog(currentPlayLogId.current, { duration, totalDuration });
+                        currentPlayLogId.current = null;
+                        playStartTime.current = null;
+                    }
+                });
+                audio.addEventListener('error', (e) => {
+                    console.error('Audio loading issue:', e);
+                    setError('Audio is not ready yet');
+                });
+                audioRef.current = audio;
+                return audio;
+            });
+        }
+    }, [cachedPlayContent, cId]); // cId for long_text localStorage key
 
     // 组件卸载时的清理
     useEffect(() => {
@@ -222,94 +278,93 @@ export function MorningBriefing({
         };
     }, [onSavePlaybackState]);
 
-    // Load play content - 只在首次加载时请求，或重新加载页面时请求
+    // Load play content - 使用新接口 getPlayContentList（三种规则）
     useEffect(() => {
-        // 如果有缓存，或者正在加载，或者已经加载过，不再重复请求
-        // 注意：这里 isLoadingPlayContent 可能是父组件传入的props (false)，不要混淆
-        // 这里的逻辑主要是为了防止多次调用 getTodayPlayContent
-
-        if (cachedPlayContent || hasLoadedPlayContent.current) {
-            return;
-        }
+        if (cachedPlayContent || hasLoadedPlayContent.current) return;
 
         async function loadPlayContent() {
-            // 防止并发请求：再次检查状态
-            if (hasLoadedPlayContent.current || cachedPlayContent) {
-                return;
-            }
+            if (hasLoadedPlayContent.current || cachedPlayContent) return;
 
             hasLoadedPlayContent.current = true;
-
             try {
-                // Only show loading state if we don't have tentative content
-                if (!playContent) {
-                    setIsLoading(true);
-                }
-
+                if (!playContent) setIsLoading(true);
                 setError(null);
-                if (onPlayContentLoadingChange) {
-                    onPlayContentLoadingChange(true);
-                }
+                if (onPlayContentLoadingChange) onPlayContentLoadingChange(true);
 
-                // Fetch play content：根据 URL 的 sn（/p/:sn）定位 magnet，无 sn 时用 cId（magnet id）
-                const content = await getTodayPlayContent(sn ? { sn } : { magnetId: cId || null });
-
-                if (!content) {
+                const response = await getPlayContentList(sn ? { sn } : { magnetId: cId || null });
+                if (!response) {
                     setError('No content available at the moment');
-                    if (onPlayContentLoadingChange) {
-                        onPlayContentLoadingChange(false);
-                    }
-                    hasLoadedPlayContent.current = false; // 失败时允许重试
+                    hasLoadedPlayContent.current = false;
                     return;
                 }
 
+                const { playback_rule: rule, items = [], config_id: configId, hasZipCode, locationFormatted } = response;
+                const hasZip = hasZipCode != null ? hasZipCode : false;
+                const locFormatted = locationFormatted ?? null;
+
+                let currentItem = null;
+                let longTextKey = null;
+                let longTextN = 0;
+
+                if (rule === 'rss' || rule === 'latest') {
+                    currentItem = items[0] ?? null;
+                } else if (rule === 'long_text_sequential' && items.length > 0 && configId != null) {
+                    longTextKey = playIndexStorageKey(sn || cId, configId);
+                    if (!longTextKey) { hasLoadedPlayContent.current = false; return; }
+                    longTextN = items.length;
+                    let idx = parseInt(localStorage.getItem(longTextKey), 10);
+                    if (Number.isNaN(idx) || idx >= items.length) idx = 0;
+                    localStorage.setItem(longTextKey, String(idx)); // 持久化当前索引，ended 时才能正确读到并 +1
+                    currentItem = items[idx] ?? null;
+                }
+
+                if (!currentItem) {
+                    setError('No content available at the moment');
+                    hasLoadedPlayContent.current = false;
+                    return;
+                }
+
+                const content = {
+                    ...currentItem,
+                    hasZipCode: hasZip,
+                    locationFormatted: locFormatted,
+                };
                 setPlayContent(content);
 
-                // Onboarding check: no zip code and not skipped
                 const skipped = localStorage.getItem('zip_onboarding_skipped');
-                if (!content.hasZipCode && !skipped) {
-                    setShowOnboarding(true);
-                }
+                if (!hasZip && !skipped) setShowOnboarding(true);
 
-                // 通知父组件缓存内容
-                if (onPlayContentLoaded) {
-                    onPlayContentLoaded(content);
-                }
+                if (onPlayContentLoaded) onPlayContentLoaded(response);
 
-
-                // Create audio element if audio URL exists
                 if (content.audio_url) {
                     const audio = new Audio(content.audio_url);
                     audio.addEventListener('ended', () => {
                         setIsPlaying(false);
+                        if (longTextKey && longTextN > 0) {
+                            const idx = parseInt(localStorage.getItem(longTextKey), 10);
+                            const next = Number.isNaN(idx) ? 0 : (idx + 1) % longTextN;
+                            localStorage.setItem(longTextKey, String(next));
+                        }
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
                     setAudioElement(audio);
-                    audioRef.current = audio; // 更新ref
+                    audioRef.current = audio;
                 }
-
             } catch (err) {
                 console.error('Content loading issue:', err);
                 setError('Please try again in a moment');
-                hasLoadedPlayContent.current = false; // 失败时允许重试
+                hasLoadedPlayContent.current = false;
             } finally {
                 setIsLoading(false);
-                if (onPlayContentLoadingChange) {
-                    onPlayContentLoadingChange(false);
-                }
+                if (onPlayContentLoadingChange) onPlayContentLoadingChange(false);
             }
         }
 
         loadPlayContent();
-
-        // Cleanup audio element
-        return () => {
-            // Cleanup logic moved to dedicated effect
-        };
-    }, []); // 只在组件首次挂载时执行，不依赖任何变量
+    }, []);
 
     const handlePlay = async () => {
         if (!audioElement) {
