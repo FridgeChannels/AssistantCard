@@ -40,10 +40,10 @@ function parseAnswerWithMethod(text) {
   return { text, answerMethod: null };
 }
 
-function App({ cId = '', sn = '', magnetContext = null }) {
-  const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'assistantPromptChat' | 'musicChat' | 'history'
+function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  }) {
+  const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'musicChat' | 'history'
   const [userRole, setUserRole] = useState('buyer'); // 'buyer' | 'seller' | null - 默认设为 buyer
-  const [selectedLocation, setSelectedLocation] = useState(null); // Location selection for Morning Briefing
+  const [selectedLocation, setSelectedLocation] = useState(initialLocation); // Location selection for Morning Briefing
   const [chatHistory, setChatHistory] = useState([]); // Array of { question, answer }
   const [isTyping, setIsTyping] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -492,6 +492,7 @@ function App({ cId = '', sn = '', magnetContext = null }) {
                 }}
                 onSavePlaybackState={handleSavePlaybackState}
                 selectedLocation={selectedLocation}
+                initialLocation={initialLocation}
                 onLocationSelect={(location) => {
                   setSelectedLocation(location);
                   if (location && location.postcode && cId) {

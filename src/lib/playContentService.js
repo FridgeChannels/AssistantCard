@@ -10,7 +10,14 @@ import { apiGetTodayPlayContent } from '../api/backendClient.js'
 export async function getTodayPlayContent(opts = null) {
     try {
         const response = await apiGetTodayPlayContent(opts ?? {})
-        return response ? response.content : null
+        if (response?.content) {
+            return {
+                ...response.content,
+                ...(response.hasZipCode != null && { hasZipCode: response.hasZipCode }),
+                ...(response.locationFormatted != null && { locationFormatted: response.locationFormatted }),
+            }
+        }
+        return null
     } catch (error) {
         console.error('获取播放内容时发生错误:', error)
         return null
