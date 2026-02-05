@@ -113,6 +113,15 @@ function App({ cId = '', sn = '', magnetContext = null }) {
   // 获取代理信息
   useEffect(() => {
     const fetchAgentInfo = async () => {
+      const cta = magnetContext?.cta || null;
+      if (cta) {
+        setAgentInfo({
+          phone: cta.phone || '',
+          email: cta.email || '',
+          name: cta.name || 'James',
+        });
+        return;
+      }
       if (cId) {
         const info = await getAgentInfo(cId);
         if (info) {
@@ -124,7 +133,7 @@ function App({ cId = '', sn = '', magnetContext = null }) {
       }
     };
     fetchAgentInfo();
-  }, [cId]);
+  }, [cId, magnetContext]);
 
   // 记录页面进入日志（只记录一次）
   useEffect(() => {

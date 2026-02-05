@@ -4,10 +4,13 @@ import { apiGetMagnetBySn } from '../api/backendClient.js'
 const snToMagnetIdCache = new Map()
 // 全局缓存：sn -> 完整 magnet 信息（id, solution, cta）
 const snToMagnetCache = new Map()
+// 全局缓存：magnet_id -> stage（避免重复请求 /api/magnets/:id/stage）
+const magnetIdToStageCache = new Map()
 
 // 当前会话正在使用的 magnet 信息（方便其他模块直接读取）
 let currentMagnetId = null
 let currentSn = null
+let currentMagnetStage = null
 
 /**
  * 根据 sn 获取完整 magnet 信息（id、solution、cta），供 CTA 按钮等使用
@@ -21,6 +24,7 @@ export async function getMagnetBySn(sn) {
   if (cached) {
     currentSn = sn
     currentMagnetId = cached?.id ?? null
+    currentMagnetStage = cached?.stage ?? currentMagnetStage
     return cached
   }
 
@@ -34,6 +38,10 @@ export async function getMagnetBySn(sn) {
     snToMagnetIdCache.set(sn, data.id)
     currentSn = sn
     currentMagnetId = data.id
+    currentMagnetStage = data?.stage ?? null
+    if (data?.id != null && data?.stage != null) {
+      magnetIdToStageCache.set(String(data.id), data.stage || '')
+    }
     return data
   } catch (e) {
     console.error('获取 magnet 信息时发生异常:', e)
@@ -62,6 +70,14 @@ export function getCurrentMagnetId() {
 }
 
 /**
+ * 获取当前会话使用的 magnet.stage（如果已经通过 SN 解析过）
+ * @returns {string|null}
+ */
+export function getCurrentMagnetStage() {
+  return currentMagnetStage
+}
+
+/**
  * 获取当前会话使用的 sn（如果已经通过 SN 解析过）
  * @returns {string|null}
  */
@@ -79,3 +95,13 @@ export function getCachedMagnetIdBySn(sn) {
   return snToMagnetIdCache.get(sn) || null
 }
 
+/**
+ * 仅从缓存中读取指定 magnet_id 对应的 stage（不会触发网络请求）
+ * @param {string} magnetId
+ * @returns {string|null}
+ */
+export function getCachedMagnetStageByMagnetId(magnetId) {
+  if (!magnetId) return null
+  if (!magnetIdToStageCache.has(String(magnetId))) return null
+  return magnetIdToStageCache.get(String(magnetId)) ?? null
+}

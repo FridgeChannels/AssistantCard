@@ -6,9 +6,13 @@
  */
 
 import { apiGetMagnetStage } from '../api/backendClient.js';
+import { getCachedMagnetStageByMagnetId } from './magnetIdService';
 
 // 本地后端代理地址
 const API_URL = '/api/related-questions';
+
+// cId(magnet_id) -> stage 缓存（避免每次都请求 /api/magnets/:id/stage）
+const stageCache = new Map();
 
 /**
  * 获取推荐问题列表
@@ -23,10 +27,23 @@ export async function getRelatedQuestions(cId, conversationId = '') {
     if (!cId) {
       console.warn('Customer ID (cId) 未提供，使用空字符串');
     } else {
-      try {
-        stage = await apiGetMagnetStage(cId);
-      } catch (err) {
-        console.warn('查询 magnet 表异常:', err);
+      if (stageCache.has(cId)) {
+        stage = stageCache.get(cId) || '';
+      } else {
+        const cachedStage = getCachedMagnetStageByMagnetId(cId);
+        if (cachedStage != null) {
+          stage = cachedStage || '';
+          stageCache.set(cId, stage);
+        } else {
+          try {
+            stage = await apiGetMagnetStage(cId);
+          } catch (err) {
+            console.warn('查询 magnet 表异常:', err);
+            stage = '';
+          } finally {
+            stageCache.set(cId, stage || '');
+          }
+        }
       }
     }
 
@@ -42,7 +59,7 @@ export async function getRelatedQuestions(cId, conversationId = '') {
         },
         query: 'anything',
         response_mode: 'streaming',
-        conversation_id: '',
+        conversation_id: conversationId || '',
         user: cId || 'abc-123',
       }),
     });
