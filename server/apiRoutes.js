@@ -712,6 +712,196 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
+  // 播放内容列表（三种规则：long_text_sequential / rss / latest），zip_code 不参与取数
+  app.get('/api/play-content/list', async (req, res) => {
+    const { sn, magnetId: magnetIdQuery, debug: debugQuery } = req.query;
+    const includeDebug = debugQuery === '1' || debugQuery === 'true';
+
+    const toItem = (row) => ({
+      id: row.id,
+      title: row.headline,
+      audio_url: row.audio_url,
+    });
+
+    try {
+      const timing = createServerTiming();
+      let magnet = null;
+      let industrySolutionId = null;
+
+      if (sn) {
+        const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_sn', () =>
+          supabase
+            .from('magnet')
+            .select('id, magnet_config_id, zip_code, formatted')
+            .eq('sn', sn)
+            .maybeSingle(),
+        );
+        if (!magnetErr) magnet = m;
+      } else if (magnetIdQuery) {
+        const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_id', () =>
+          supabase
+            .from('magnet')
+            .select('id, magnet_config_id, zip_code, formatted')
+            .eq('id', magnetIdQuery)
+            .maybeSingle(),
+        );
+        if (!magnetErr) magnet = m;
+      }
+
+      const hasZipCode = !!(magnet?.zip_code);
+      const locationFormatted = magnet?.formatted ?? null;
+
+      if (!magnet) {
+        setCacheSeconds(res, 60, 300);
+        timing.setHeader(res);
+        const payload = {
+          playback_rule: 'latest',
+          items: [],
+          hasZipCode: false,
+          locationFormatted: null,
+        };
+        if (includeDebug) payload._debug = { reason: 'no_magnet' };
+        return res.json(payload);
+      }
+
+      if (magnet.magnet_config_id) {
+        const { data: mc, error: mcErr } = await timing.time('sb_magnet_config', () =>
+          supabase
+            .from('magnet_config')
+            .select('industry_solution_id')
+            .eq('id', magnet.magnet_config_id)
+            .maybeSingle(),
+        );
+        if (!mcErr && mc?.industry_solution_id != null) industrySolutionId = mc.industry_solution_id;
+      }
+
+      const { data: playConfig, error: configErr } = await timing.time('sb_play_content_config', () =>
+        supabase
+          .from('magnet_play_content_configs')
+          .select('id, source_type, processing_type')
+          .eq('magnet_config_id', magnet.magnet_config_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      );
+
+      if (configErr || !playConfig) {
+        const selectCols = 'id, headline, audio_url';
+        let latestQuery = supabase.from('play_news_contents').select(selectCols);
+        if (industrySolutionId != null) {
+          latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
+        }
+        const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
+          latestQuery.order('created_at', { ascending: false }).limit(1),
+        );
+        if (latestErr) {
+          console.error('Error querying play_news_contents (latest):', latestErr);
+          return res.status(500).json({ error: 'Failed to query play_news_contents' });
+        }
+        const items = (latest?.length > 0) ? [toItem(latest[0])] : [];
+        setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
+        timing.setHeader(res);
+        const payloadLatest = {
+          playback_rule: 'latest',
+          items,
+          hasZipCode,
+          locationFormatted,
+        };
+        if (includeDebug) payloadLatest._debug = { reason: 'no_config_or_error', magnet_config_id: magnet.magnet_config_id };
+        return res.json(payloadLatest);
+      }
+
+      const configId = playConfig.id;
+      const isRss =
+        String(playConfig.source_type).toLowerCase() === 'rss' &&
+        String(playConfig.processing_type).toLowerCase() === 'periodic';
+      const isLongText =
+        String(playConfig.source_type).toLowerCase() === 'file' &&
+        String(playConfig.processing_type).toLowerCase() === 'once';
+
+      const selectCols = 'id, headline, audio_url';
+
+      if (isRss) {
+        const { data: rows, error: rssErr } = await timing.time('sb_play_rss', () =>
+          supabase
+            .from('play_news_contents')
+            .select(selectCols)
+            .eq('config_id', configId)
+            .order('order_index', { ascending: false })
+            .limit(1),
+        );
+        if (rssErr) {
+          console.error('Error querying play_news_contents (rss):', rssErr);
+          return res.status(500).json({ error: 'Failed to query play_news_contents' });
+        }
+        const items = (rows?.length > 0) ? [toItem(rows[0])] : [];
+        setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
+        timing.setHeader(res);
+        const payloadRss = {
+          playback_rule: 'rss',
+          items,
+          hasZipCode,
+          locationFormatted,
+        };
+        if (includeDebug) payloadRss._debug = { magnet_config_id: magnet.magnet_config_id, config_id: configId, source_type: playConfig.source_type, processing_type: playConfig.processing_type };
+        return res.json(payloadRss);
+      }
+
+      if (isLongText) {
+        const { data: rows, error: ltErr } = await timing.time('sb_play_longtext', () =>
+          supabase
+            .from('play_news_contents')
+            .select(selectCols)
+            .eq('config_id', configId)
+            .order('order_index', { ascending: true }),
+        );
+        if (ltErr) {
+          console.error('Error querying play_news_contents (long text):', ltErr);
+          return res.status(500).json({ error: 'Failed to query play_news_contents' });
+        }
+        const items = (rows ?? []).map(toItem);
+        setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
+        timing.setHeader(res);
+        const payloadLt = {
+          playback_rule: 'long_text_sequential',
+          items,
+          config_id: configId,
+          hasZipCode,
+          locationFormatted,
+        };
+        if (includeDebug) payloadLt._debug = { magnet_config_id: magnet.magnet_config_id, config_id: configId, source_type: playConfig.source_type, processing_type: playConfig.processing_type };
+        return res.json(payloadLt);
+      }
+
+      const selectColsFallback = 'id, headline, audio_url';
+      let fallbackQuery = supabase.from('play_news_contents').select(selectColsFallback);
+      if (industrySolutionId != null) {
+        fallbackQuery = fallbackQuery.eq('industry_solution_id', industrySolutionId);
+      }
+      const { data: fallback, error: fallbackErr } = await timing.time('sb_play_fallback', () =>
+        fallbackQuery.order('created_at', { ascending: false }).limit(1),
+      );
+      if (fallbackErr) {
+        console.error('Error querying play_news_contents (fallback):', fallbackErr);
+        return res.status(500).json({ error: 'Failed to query play_news_contents' });
+      }
+      const items = (fallback?.length > 0) ? [toItem(fallback[0])] : [];
+      setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
+      timing.setHeader(res);
+      const payloadFallback = {
+        playback_rule: 'latest',
+        items,
+        hasZipCode,
+        locationFormatted,
+      };
+      if (includeDebug) payloadFallback._debug = { reason: 'config_not_rss_or_longtext', magnet_config_id: magnet.magnet_config_id, config_id: configId, source_type: playConfig.source_type, processing_type: playConfig.processing_type };
+      return res.json(payloadFallback);
+    } catch (err) {
+      console.error('Unexpected error in /api/play-content/list', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // 根据 content_play.id 获取记录并解析出 magnetId（供 /tp/:id 页面使用）
   app.get('/api/content-play/:id', async (req, res) => {
     const { id } = req.params;
