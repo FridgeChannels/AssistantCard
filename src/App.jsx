@@ -264,6 +264,9 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     const isAssistantPromptChat = page === 'assistantPromptChat';
     const chatApiFunction = isAssistantPromptChat ? sendAssistantPromptMessageStream : sendChatMessageStream;
     
+    // 准备 assistant_config 参数
+    const assistantConfig = magnetContext?.assistant_config || null;
+    
     // 调用 chat API
     chatApiFunction(
       query,
@@ -400,7 +403,9 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
         });
       },
       // agentName: 代理名称
-      agentInfo.name || 'James'
+      agentInfo.name || 'James',
+      // assistantConfig: 助手配置参数（仅对 Assistant Prompt API 有效）
+      assistantConfig
     );
   };
 
