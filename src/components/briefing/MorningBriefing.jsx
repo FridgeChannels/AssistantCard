@@ -102,6 +102,7 @@ export function MorningBriefing({
     onPlayContentLoaded,
     onPlayContentLoadingChange,
     onSavePlaybackState,
+    onLongTextIndexChange,
     selectedLocation,
     onLocationSelect,
     hideLocationSelector = false,
@@ -132,6 +133,7 @@ export function MorningBriefing({
     const currentPlayLogId = useRef(null); // 当前播放日志ID
     const playStartTime = useRef(null); // 播放开始时间
     const audioRef = useRef(null); // 用于cleanup中访问audioElement
+    const currentLongTextIndexRef = useRef(null); // longtext 当前展示条索引，卸载/ended 时同步到父 cache
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [showContactOptions, setShowContactOptions] = useState(false);
@@ -199,6 +201,7 @@ export function MorningBriefing({
                         audio.currentTime = cachedPlayContent.savedCurrentTime;
                     }
                     audio.addEventListener('ended', async () => {
+                        if (onEnded) console.log('audio ended', { longtext: true });
                         setIsPlaying(false);
                         if (currentPlayLogId.current && playStartTime.current) {
                             const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
@@ -213,6 +216,16 @@ export function MorningBriefing({
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
+                    // longtext 播完未停兜底：timeupdate 在 ended 未触发时同步 isPlaying
+                    if (onEnded) {
+                        const onTimeUpdate = () => {
+                            if (audio.duration && !Number.isNaN(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration) {
+                                setIsPlaying(false);
+                                audio.removeEventListener('timeupdate', onTimeUpdate);
+                            }
+                        };
+                        audio.addEventListener('timeupdate', onTimeUpdate);
+                    }
                     audioRef.current = audio;
                     return audio;
                 });
@@ -229,13 +242,20 @@ export function MorningBriefing({
             const key = playIndexStorageKey(sn || cId, cachedPlayContent.config_id);
             if (!key) return;
             const N = items.length;
-            let idx = parseInt(localStorage.getItem(key), 10);
-            if (Number.isNaN(idx) || idx >= N) idx = 0;
+            // 应用内返回：优先用 cache 的 currentLongTextIndex，保证「回来同一条」
+            const cachedIdx = cachedPlayContent.currentLongTextIndex;
+            let idx = (cachedIdx != null && Number.isInteger(cachedIdx) && cachedIdx >= 0 && cachedIdx < N)
+                ? cachedIdx
+                : parseInt(localStorage.getItem(key), 10);
+            if (Number.isNaN(idx) || idx < 0 || idx >= N) idx = 0;
+            currentLongTextIndexRef.current = idx;
             const item = items[idx];
             applyItem(item, item?.audio_url, () => {
                 const current = parseInt(localStorage.getItem(key), 10);
                 const next = Number.isNaN(current) ? 0 : (current + 1) % N;
                 localStorage.setItem(key, String(next));
+                currentLongTextIndexRef.current = next;
+                if (onLongTextIndexChange) onLongTextIndexChange(next);
             });
             return;
         }
@@ -267,7 +287,7 @@ export function MorningBriefing({
                 return audio;
             });
         }
-    }, [cachedPlayContent, cId]); // cId for long_text localStorage key
+    }, [cachedPlayContent, cId, onLongTextIndexChange]); // cId for long_text localStorage key
 
     // 组件卸载时的清理
     useEffect(() => {
@@ -290,9 +310,9 @@ export function MorningBriefing({
                 // 暂停播放
                 audio.pause();
 
-                // 保存进度到父组件
+                // 保存进度到父组件（longtext 时一并传当前索引，便于返回同一条）
                 if (onSavePlaybackState) {
-                    onSavePlaybackState(audio.currentTime);
+                    onSavePlaybackState(audio.currentTime, currentLongTextIndexRef.current);
                 }
             }
         };
@@ -325,6 +345,7 @@ export function MorningBriefing({
                 let currentItem = null;
                 let longTextKey = null;
                 let longTextN = 0;
+                let longTextDisplayIndex = null; // 仅 longtext 时有值，供 onPlayContentLoaded 写入 cache
 
                 if (rule === 'rss' || rule === 'latest') {
                     currentItem = items[0] ?? null;
@@ -332,10 +353,22 @@ export function MorningBriefing({
                     longTextKey = playIndexStorageKey(sn || cId, configId);
                     if (!longTextKey) { hasLoadedPlayContent.current = false; return; }
                     longTextN = items.length;
+                    const N = items.length;
                     let idx = parseInt(localStorage.getItem(longTextKey), 10);
-                    if (Number.isNaN(idx) || idx >= items.length) idx = 0;
-                    localStorage.setItem(longTextKey, String(idx)); // 持久化当前索引，ended 时才能正确读到并 +1
-                    currentItem = items[idx] ?? null;
+                    let displayIdx; // 本次展示的索引，用于 currentLongTextIndex
+                    if (Number.isNaN(idx) || idx < 0 || idx >= N) {
+                        // 方案 B：首次不推进，显示第 0 条
+                        displayIdx = 0;
+                        localStorage.setItem(longTextKey, String(0));
+                        currentItem = items[0] ?? null;
+                    } else {
+                        // 非首次：每贴播下一条
+                        displayIdx = (idx + 1) % N;
+                        localStorage.setItem(longTextKey, String(displayIdx));
+                        currentItem = items[displayIdx] ?? null;
+                    }
+                    longTextDisplayIndex = displayIdx;
+                    currentLongTextIndexRef.current = displayIdx;
                 }
 
                 if (!currentItem) {
@@ -354,22 +387,39 @@ export function MorningBriefing({
                 const skipped = localStorage.getItem('zip_onboarding_skipped');
                 if (!hasZip && !skipped) setShowOnboarding(true);
 
-                if (onPlayContentLoaded) onPlayContentLoaded(response);
+                if (onPlayContentLoaded) {
+                    const payload = longTextDisplayIndex != null
+                        ? { ...response, currentLongTextIndex: longTextDisplayIndex }
+                        : response;
+                    onPlayContentLoaded(payload);
+                }
 
                 if (content.audio_url) {
                     const audio = new Audio(content.audio_url);
                     audio.addEventListener('ended', () => {
+                        if (longTextKey && longTextN > 0) console.log('audio ended', { longtext: true });
                         setIsPlaying(false);
                         if (longTextKey && longTextN > 0) {
                             const idx = parseInt(localStorage.getItem(longTextKey), 10);
                             const next = Number.isNaN(idx) ? 0 : (idx + 1) % longTextN;
                             localStorage.setItem(longTextKey, String(next));
+                            currentLongTextIndexRef.current = next;
+                            if (onLongTextIndexChange) onLongTextIndexChange(next);
                         }
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
+                    if (longTextKey && longTextN > 0) {
+                        const onTimeUpdate = () => {
+                            if (audio.duration && !Number.isNaN(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration) {
+                                setIsPlaying(false);
+                                audio.removeEventListener('timeupdate', onTimeUpdate);
+                            }
+                        };
+                        audio.addEventListener('timeupdate', onTimeUpdate);
+                    }
                     setAudioElement(audio);
                     audioRef.current = audio;
                 }

@@ -280,7 +280,8 @@ function TpPage({ cId = '', contentPlay = null }) {
     return lastAnswer?.text || '';
   };
 
-  const handleSavePlaybackState = (currentTime) => {
+  // 兼容第二参数 longTextIndex（TpPage 无 longtext 列表，仅用 currentTime）
+  const handleSavePlaybackState = (currentTime, _longTextIndex) => {
     if (playContentCacheRef.current) {
       playContentCacheRef.current = { ...playContentCacheRef.current, savedCurrentTime: currentTime };
     }

@@ -146,7 +146,7 @@ export function AssistantPromptChat({
       <div className="flex-none z-20 px-4 pb-4 pt-2 safe-area-inset-bottom" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
         {(chatHistory.length > 0 && !isTyping && !currentAnswer) ? (
           <div className="space-y-3">
-            <Glass variant="card" className="px-6 py-4">
+            {/* <Glass variant="card" className="px-6 py-4">
               <button
                 onClick={handleBackToBriefing}
                 className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
@@ -154,7 +154,7 @@ export function AssistantPromptChat({
                 <ArrowLeft className="w-5 h-5 text-[#010101]" />
                 <span className="text-base font-medium text-[#010101]">Back to Briefing</span>
               </button>
-            </Glass>
+            </Glass> */}
             <InputSection
               onSearch={handleSearch}
               isCompact={true}

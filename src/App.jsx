@@ -437,13 +437,19 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     return lastAnswer?.text || '';
   };
 
-  // Save playback state (current time) when leaving briefing page
-  const handleSavePlaybackState = (currentTime) => {
+  // Save playback state (current time, optional longtext index) when leaving briefing page
+  const handleSavePlaybackState = (currentTime, longTextIndex) => {
     if (playContentCacheRef.current) {
-      playContentCacheRef.current = {
-        ...playContentCacheRef.current,
-        savedCurrentTime: currentTime
-      };
+      const next = { ...playContentCacheRef.current, savedCurrentTime: currentTime };
+      if (longTextIndex != null) next.currentLongTextIndex = longTextIndex;
+      playContentCacheRef.current = next;
+    }
+  };
+
+  // longtext 本页播完时同步 cache 索引，便于返回时同一条
+  const handleLongTextIndexChange = (nextIndex) => {
+    if (playContentCacheRef.current) {
+      playContentCacheRef.current = { ...playContentCacheRef.current, currentLongTextIndex: nextIndex };
     }
   };
 
@@ -496,6 +502,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                   isLoadingPlayContentRef.current = loading;
                 }}
                 onSavePlaybackState={handleSavePlaybackState}
+                onLongTextIndexChange={handleLongTextIndexChange}
                 selectedLocation={selectedLocation}
                 initialLocation={initialLocation}
                 onLocationSelect={(location) => {
