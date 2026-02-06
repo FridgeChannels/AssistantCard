@@ -410,10 +410,13 @@ export function registerApiRoutes(app, supabase) {
             if (method) permSet.add('METHOD_' + toKey(method));
           });
 
+          const permissions = [...permSet].sort();
+          console.log(`[by-sn] SN=${sn}, industry_solution_id=${industrySolutionId}, permissions count=${permissions.length}, permissions=`, permissions);
+
           payload.solution = {
             route: route ?? 'real-estate',
             id: String(solutionRow.id),
-            permissions: [...permSet].sort(),
+            permissions: permissions,
           };
         }
       }
@@ -447,7 +450,14 @@ export function registerApiRoutes(app, supabase) {
         };
       }
 
-      setCacheSeconds(res, 10, 60);
+      // 开发环境禁用缓存，确保权限变更能立即生效
+      if (process.env.NODE_ENV !== 'production') {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else {
+        setCacheSeconds(res, 1, 60);
+      }
       timing.setHeader(res);
       return res.json(payload);
     } catch (err) {

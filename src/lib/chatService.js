@@ -29,7 +29,7 @@ export async function sendChatMessage(query, cId, conversationId = '', agentName
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: {
+        input: {
           magnet_id: cId,
           agent_name: agentName || '',
           ...(assistantConfig ? { prompt: assistantConfig } : {})
@@ -460,6 +460,7 @@ export async function sendAssistantPromptMessageStream(
         inputs: {
           magnet_id: cId,
           agent_name: agentName || '',
+          prompt: assistantConfig || '', // prompt 字段必须存在，即使为空字符串
         },
         query: query,
         response_mode: 'streaming',
