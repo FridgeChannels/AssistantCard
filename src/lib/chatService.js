@@ -32,6 +32,7 @@ export async function sendChatMessage(query, cId, conversationId = '', agentName
         inputs: {
           magnet_id: cId,
           agent_name: agentName || '',
+          ...(assistantConfig ? { prompt: assistantConfig } : {})
         },
         query: query,
         response_mode: 'streaming',
@@ -416,6 +417,7 @@ export async function sendChatMessageStream(
  * @param {Function} onComplete - Callback when complete (answer: string, conversationId: string) => void
  * @param {Function} onError - Callback on error (error: Error) => void
  * @param {string} agentName - Agent name (optional, defaults to empty string)
+ * @param {string} assistantConfig - Assistant configuration from magnet config (optional)
  */
 export async function sendAssistantPromptMessageStream(
   query,
@@ -424,7 +426,8 @@ export async function sendAssistantPromptMessageStream(
   onChunk,
   onComplete,
   onError,
-  agentName = ''
+  agentName = '',
+  assistantConfig = null
 ) {
   if (!ASSISTANT_PROMPT_API_URL) {
     const error = new Error('Assistant Prompt API URL is not configured. Please set VITE_ASSISTANT_PROMPT_API_URL in environment variables.');

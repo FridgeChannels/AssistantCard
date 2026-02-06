@@ -168,6 +168,7 @@ function TpPage({ cId = '', contentPlay = null }) {
       conversationId,
       (chunk) => {
         streamQueueRef.current += chunk;
+        
         startStreamTimer();
       },
       (finalAnswer, newConversationId, answerMethodFromAPI) => {

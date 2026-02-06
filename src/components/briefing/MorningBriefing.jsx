@@ -47,15 +47,36 @@ const CTA_CONTACT_PERMISSIONS = [
     'METHOD_METHOD_CTA_CONTACT',
 ];
 
-function hasAllPermissions(permissions = [], required = []) {
-    if (!Array.isArray(permissions) || required.length === 0) return false;
-    const set = new Set(permissions);
+function normalizePermissionSet(permissions = []) {
+    const list = Array.isArray(permissions) ? permissions : [];
+    const set = new Set();
+    list.forEach((perm) => {
+        if (!perm) return;
+        set.add(perm);
+        const match = perm.match(/^(MOD|FUNC|METHOD)_(.+)$/);
+        if (!match) return;
+        const prefix = match[1];
+        const rest = match[2];
+        if (rest.startsWith(`${prefix}_`)) {
+            // Handle double-prefixed permissions by adding single-prefixed variant
+            set.add(`${prefix}_${rest.slice(prefix.length + 1)}`);
+        } else {
+            // Handle single-prefixed permissions by adding double-prefixed variant
+            set.add(`${prefix}_${prefix}_${rest}`);
+        }
+    });
+    return set;
+}
+
+function hasAllPermissions(permissionSet, required = []) {
+    if (!required.length) return false;
+    const set = permissionSet instanceof Set ? permissionSet : normalizePermissionSet(permissionSet);
     return required.every((p) => set.has(p));
 }
 
 // 检查是否包含任何 Assistant 相关权限
-function hasAnyAssistantPermission(permissions = []) {
-    if (!Array.isArray(permissions)) return false;
+function hasAnyAssistantPermission(permissionSet) {
+    const set = permissionSet instanceof Set ? permissionSet : normalizePermissionSet(permissionSet);
     const assistantPermissions = [
         'MOD_MOD_ASSISTANT',
         'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
@@ -65,8 +86,7 @@ function hasAnyAssistantPermission(permissions = []) {
         'FUNC_FUNC_ASSISTANT_CUSTOM_PROMT',
         'METHOD_METHOD_ASSISTANT_CUSTOM_PROMT'
     ];
-    const permissionSet = new Set(permissions);
-    return assistantPermissions.some(p => permissionSet.has(p));
+    return assistantPermissions.some(p => set.has(p));
 }
 
 export function MorningBriefing({
@@ -412,17 +432,18 @@ export function MorningBriefing({
     const cta = magnetContext?.cta;
     const hasFullCta = cta && (cta.name != null || cta.phone || cta.email || cta.chat_url || cta.skip_url);
     const permissions = magnetContext?.solution?.permissions ?? [];
-    const showChatWithLeo = hasAllPermissions(permissions, CHAT_WITH_LEO_PERMISSIONS);
-    const showChatUrlButton = hasAllPermissions(permissions, CHAT_URL_PERMISSIONS);
+    const permissionSet = normalizePermissionSet(permissions);
+    const showChatWithLeo = hasAllPermissions(permissionSet, CHAT_WITH_LEO_PERMISSIONS);
+    const showChatUrlButton = hasAllPermissions(permissionSet, CHAT_URL_PERMISSIONS);
     
     // 权限冲突检测：当 FUNC_FUNC_CTA_ROUTE 与 ASSISTANT 相关权限同时存在时，优先显示 ASSISTANT 按钮，隐藏 CTA 按钮
-    const hasCtaRoute = permissions.includes('FUNC_FUNC_CTA_ROUTE');
-    const hasAssistantCustomMade = permissions.includes('FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE');
-    const hasAssistantChatUrl = permissions.includes('FUNC_FUNC_ASSISTANT_CHAT_URL');
+    const hasCtaRoute = permissionSet.has('FUNC_FUNC_CTA_ROUTE');
+    const hasAssistantCustomMade = permissionSet.has('FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE');
+    const hasAssistantChatUrl = permissionSet.has('FUNC_FUNC_ASSISTANT_CHAT_URL');
     const hasConflict = hasCtaRoute && (hasAssistantCustomMade || hasAssistantChatUrl);
     
-    const showSkipUrlButton = hasConflict ? false : hasAllPermissions(permissions, SKIP_URL_PERMISSIONS);
-    const showCtaContactButton = hasConflict ? false : hasAllPermissions(permissions, CTA_CONTACT_PERMISSIONS);
+    const showSkipUrlButton = hasConflict ? false : hasAllPermissions(permissionSet, SKIP_URL_PERMISSIONS);
+    const showCtaContactButton = hasConflict ? false : hasAllPermissions(permissionSet, CTA_CONTACT_PERMISSIONS);
 
     const handleOnboardingSkip = () => {
         localStorage.setItem('zip_onboarding_skipped', 'true');
@@ -729,7 +750,7 @@ export function MorningBriefing({
                                 <>
                                     {/* 按钮优先级：Assistant > Contact > Skip URL */}
                                     {/* 检查是否有任何 Assistant 相关权限 - 最高优先级 */}
-                                    {hasAnyAssistantPermission(permissions) ? (
+                                    {hasAnyAssistantPermission(permissionSet) ? (
                                         <>
                                             {/* Assistant 类型按钮优先显示 */}
                                             {/* 第1个：跳转站内 Chat 页面，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE、METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE 时显示 */}
@@ -746,7 +767,7 @@ export function MorningBriefing({
                                                 </Glass>
                                             )}
                                             {/* 第2个：Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
-                                            {!showChatWithLeo && hasAllPermissions(permissions, ASSISTANT_PROMPT_PERMISSIONS) && (
+                                            {!showChatWithLeo && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
                                                         type="button"
@@ -848,7 +869,7 @@ export function MorningBriefing({
                             ) : (
                                 <>
                                     {/* 对于没有完整 CTA 的情况，按优先级显示按钮：Assistant > Contact > Skip */}
-                                    {hasAnyAssistantPermission(permissions) ? (
+                                    {hasAnyAssistantPermission(permissionSet) ? (
                                         // 最高优先级：Assistant
                                         <>
                                             <Glass variant="card" className="px-6 py-4">
@@ -874,7 +895,7 @@ export function MorningBriefing({
                                                 )}
                                             </Glass>
                                             {/* Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
-                                            {!ctaLink && !ctaTextOverride && hasAllPermissions(permissions, ASSISTANT_PROMPT_PERMISSIONS) && (
+                                            {!ctaLink && !ctaTextOverride && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
                                                         type="button"

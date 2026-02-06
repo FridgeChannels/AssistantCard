@@ -327,7 +327,7 @@ export function registerApiRoutes(app, supabase) {
         ? timing.time('sb_magnet_config', () =>
             supabase
               .from('magnet_config')
-              .select('industry_solution_id')
+              .select('industry_solution_id, assistant_config, assistant_function_code')
               .eq('id', magnetRow.magnet_config_id)
               .maybeSingle(),
           )
@@ -356,6 +356,12 @@ export function registerApiRoutes(app, supabase) {
       // 通过 magnet_config 获取 industry_solution，再组装 solution
       if (configError) {
         console.error('Error querying magnet_config:', configError);
+      }
+
+      // 添加 assistant_config 和 assistant_function_code 到响应中 (即使为空也要返回)
+      if (configRow) {
+        payload.assistant_config = configRow.assistant_config || null;
+        payload.assistant_function_code = configRow.assistant_function_code || null;
       }
 
       const industrySolutionId = configRow?.industry_solution_id ?? null;
