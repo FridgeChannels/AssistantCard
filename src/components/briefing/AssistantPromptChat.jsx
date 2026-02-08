@@ -58,7 +58,7 @@ export function AssistantPromptChat({
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">L</div>
-            <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Assistant Prompt</span>
+            <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Assistant</span>
           </div>
         </div>
         {/* Header CTA：chat_url > skip_url > 联系，无数据或无权限不展示 */}
@@ -120,7 +120,7 @@ export function AssistantPromptChat({
               question={item.question}
               answer={displayAnswer}
               onQuestionSelect={handleSearch}
-              showRelated={false} // Assistant Prompt对话中不显示推荐问题
+              showRelated={false} // Assistant对话中不显示推荐问题
               onTextJames={() => {
                 // 处理 Text James 功能
               }}

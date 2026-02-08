@@ -266,7 +266,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
       },
       // onComplete: 完成时保存最终答案和 conversation_id
       (finalAnswer, newConversationId, answerMethodFromAPI) => {
-        // 只有在非Assistant Prompt页面时才更新conversationId
+        // 只有在非Assistant页面时才更新conversationId
         if (!isAssistantPromptChat) {
           setConversationId(newConversationId);
         }
@@ -356,7 +356,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
       },
       // onError: 错误处理
       (error) => {
-        console.error(`${isAssistantPromptChat ? 'Assistant Prompt' : 'Chat'} API 调用失败:`, error);
+        console.error(`${isAssistantPromptChat ? 'Assistant' : 'Chat'} API 调用失败:`, error);
         setIsTyping(false);
         streamQueueRef.current = '';
         stopStreamTimer();
@@ -391,7 +391,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
       },
       // agentName: 代理名称
       agentInfo.name || 'James',
-      // assistantConfig: 助手配置参数（仅对 Assistant Prompt API 有效）
+      // assistantConfig: 助手配置参数（仅对 Assistant API 有效）
       assistantConfig
     );
   };

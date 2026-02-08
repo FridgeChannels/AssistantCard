@@ -15,9 +15,10 @@ let currentMagnetStage = null
 /**
  * 根据 sn 获取完整 magnet 信息（id、solution、cta），供 CTA 按钮等使用
  * @param {string} sn - 冰箱贴 SN 编号（来自路由 /p/:sn）
+ * @param {{ signal?: AbortSignal }} [opts] - 可选 signal，用于取消请求
  * @returns {Promise<{ id, solution?, cta? }|null>}
  */
-export async function getMagnetBySn(sn) {
+export async function getMagnetBySn(sn, opts = {}) {
   if (!sn) return null
 
   const cached = snToMagnetCache.get(sn)
@@ -29,7 +30,7 @@ export async function getMagnetBySn(sn) {
   }
 
   try {
-    const data = await apiGetMagnetBySn(sn)
+    const data = await apiGetMagnetBySn(sn, opts)
     if (!data) {
       console.warn('未找到对应 SN 的 magnet 记录:', sn)
       return null

@@ -5,7 +5,7 @@
 
 const API_URL = '/api/chat-messages';
 
-// Assistant Prompt API Configuration from environment variables
+// Assistant API Configuration from environment variables
 const ASSISTANT_PROMPT_API_URL = import.meta.env.VITE_ASSISTANT_PROMPT_API_URL;
 const ASSISTANT_PROMPT_API_TOKEN = import.meta.env.VITE_ASSISTANT_PROMPT_API_TOKEN;
 
@@ -408,7 +408,7 @@ export async function sendChatMessageStream(
 }
 
 /**
- * Send a chat message to the Assistant Prompt API with streaming response
+ * Send a chat message to the Assistant API with streaming response
  * Uses the API configured in environment variables
  * @param {string} query - User's question
  * @param {string} cId - Customer ID (for context)
@@ -430,13 +430,13 @@ export async function sendAssistantPromptMessageStream(
   assistantConfig = null
 ) {
   if (!ASSISTANT_PROMPT_API_URL) {
-    const error = new Error('Assistant Prompt API URL is not configured. Please set VITE_ASSISTANT_PROMPT_API_URL in environment variables.');
+    const error = new Error('Assistant API URL is not configured. Please set VITE_ASSISTANT_PROMPT_API_URL in environment variables.');
     onError?.(error);
     return;
   }
 
   if (!ASSISTANT_PROMPT_API_TOKEN) {
-    const error = new Error('Assistant Prompt API Token is not configured. Please set VITE_ASSISTANT_PROMPT_API_TOKEN in environment variables.');
+    const error = new Error('Assistant API Token is not configured. Please set VITE_ASSISTANT_PROMPT_API_TOKEN in environment variables.');
     onError?.(error);
     return;
   }
@@ -471,7 +471,7 @@ export async function sendAssistantPromptMessageStream(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Assistant Prompt API request failed: ${response.status} - ${errorText}`);
+      throw new Error(`Assistant API request failed: ${response.status} - ${errorText}`);
     }
 
     // Check if response is JSON or streaming
@@ -493,7 +493,7 @@ export async function sendAssistantPromptMessageStream(
       if (debugStream) {
         console.log('[assistant-prompt-stream] missing response body');
       }
-      throw new Error('Assistant Prompt API response body is empty.');
+      throw new Error('Assistant API response body is empty.');
     }
 
     // Process streaming response (plain text format)
@@ -620,7 +620,7 @@ export async function sendAssistantPromptMessageStream(
 
     onComplete?.(fullAnswer || "I'm sorry, I didn't receive a valid response. Please try again.", newConversationId);
   } catch (error) {
-    console.error('Assistant Prompt API call failed:', error);
+    console.error('Assistant API call failed:', error);
     onError?.(error);
   }
 }

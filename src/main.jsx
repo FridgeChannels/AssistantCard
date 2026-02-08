@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import './index.css'
@@ -17,6 +17,7 @@ function AppWithRouter() {
   const [magnetInfo, setMagnetInfo] = useState(null)
 
   useEffect(() => {
+    const controller = new AbortController()
     let cancelled = false
     setLoading(true)
 
@@ -29,13 +30,14 @@ function AppWithRouter() {
       }
 
       try {
-        const data = await getMagnetBySn(sn)
+        const data = await getMagnetBySn(sn, { signal: controller.signal })
         if (!cancelled) {
           setMagnetId(data?.id ?? '')
           setMagnetContext(data ? { solution: data.solution, cta: data.cta } : null)
           setMagnetInfo(data)
         }
       } catch (e) {
+        if (e?.name === 'AbortError') return
         console.error('根据 SN 获取 magnet 信息失败:', e)
         if (!cancelled) {
           setMagnetId('')
@@ -51,6 +53,7 @@ function AppWithRouter() {
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [sn])
 
@@ -88,9 +91,10 @@ function TpPageWithRouter() {
       setCId('')
       return
     }
+    const controller = new AbortController()
     let cancelled = false
     setStatus('loading')
-    apiGetContentPlayById(id)
+    apiGetContentPlayById(id, { signal: controller.signal })
       .then((data) => {
         if (cancelled) return
         const magnetId = data?.magnetId != null ? String(data.magnetId) : ''
@@ -104,14 +108,18 @@ function TpPageWithRouter() {
           setContentPlay(null)
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        if (e?.name === 'AbortError') return
         if (!cancelled) {
           setStatus('error')
           setCId('')
           setContentPlay(null)
         }
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [id])
 
   if (status === 'loading') {
@@ -139,14 +147,12 @@ function TpPageWithRouter() {
 }
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        {/* URL 使用 SN 编号，例如 /p/87483M0P20 */}
-        <Route path="/p/:sn?" element={<AppWithRouter />} />
-        {/* URL 使用 content_play 表主键 id，例如 /tp/123 */}
-        <Route path="/tp/:id" element={<TpPageWithRouter />} />
-      </Routes>
-    </BrowserRouter>
-  </StrictMode>,
+  <BrowserRouter>
+    <Routes>
+      {/* URL 使用 SN 编号，例如 /p/87483M0P20 */}
+      <Route path="/p/:sn?" element={<AppWithRouter />} />
+      {/* URL 使用 content_play 表主键 id，例如 /tp/123 */}
+      <Route path="/tp/:id" element={<TpPageWithRouter />} />
+    </Routes>
+  </BrowserRouter>,
 )

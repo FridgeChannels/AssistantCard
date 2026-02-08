@@ -1,3 +1,4 @@
+import './env.js'; // 必须在最前：先加载 .env / .env.local
 import express from 'express';
 import cors from 'cors';
 import path from 'path';

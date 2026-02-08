@@ -751,7 +751,7 @@ export function MorningBriefing({
                                                     </button>
                                                 </Glass>
                                             )}
-                                            {/* 第2个：Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
                                             {!showChatWithLeo && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
@@ -760,7 +760,7 @@ export function MorningBriefing({
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant Prompt</span>
+                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
                                                     </button>
                                                 </Glass>
                                             )}
@@ -879,7 +879,7 @@ export function MorningBriefing({
                                                     </button>
                                                 )}
                                             </Glass>
-                                            {/* Assistant Prompt 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
                                             {!ctaLink && !ctaTextOverride && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
@@ -888,7 +888,7 @@ export function MorningBriefing({
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant Prompt</span>
+                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
                                                     </button>
                                                 </Glass>
                                             )}

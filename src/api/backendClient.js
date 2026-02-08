@@ -15,6 +15,7 @@ async function request(path, options = {}) {
       ...(options.headers || {}),
     },
     body: options.body,
+    ...(options.signal != null && { signal: options.signal }),
   };
 
   const res = await fetch(url, fetchOptions);
@@ -47,14 +48,17 @@ async function request(path, options = {}) {
 
 /**
  * 根据 sn 获取完整 magnet 信息（id、solution、cta）
+ * @param {string} sn
+ * @param {{ signal?: AbortSignal }} [opts] - 可选 signal，用于取消请求（如 effect cleanup）
  * @returns {Promise<{ id, solution?, cta? }|null>}
  */
-export async function apiGetMagnetBySn(sn) {
+export async function apiGetMagnetBySn(sn, opts = {}) {
   if (!sn) return null;
 
   try {
     const data = await request(`/api/magnets/by-sn/${encodeURIComponent(sn)}`, {
       method: 'GET',
+      ...(opts.signal != null && { signal: opts.signal }),
     });
     // Now returns { id, formatted, zipCode }
     return data ?? null;
@@ -111,14 +115,16 @@ export async function apiGetAgentInfo(magnetId) {
 /**
  * 根据 content_play 表主键 id 获取记录及解析出的 magnetId
  * @param {string|number} id - content_play.id
+ * @param {{ signal?: AbortSignal }} [opts] - 可选 signal，用于取消请求
  * @returns {Promise<{ id, customer_id, magnetId, ... }|null>}
  */
-export async function apiGetContentPlayById(id) {
+export async function apiGetContentPlayById(id, opts = {}) {
   if (id == null || id === '') return null;
 
   try {
     const data = await request(`/api/content-play/${encodeURIComponent(id)}`, {
       method: 'GET',
+      ...(opts.signal != null && { signal: opts.signal }),
     });
     return data ?? null;
   } catch (error) {
