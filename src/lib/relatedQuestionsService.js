@@ -3,6 +3,7 @@
  * 获取推荐问题列表
  *
  * 前端只调用本地 /api/related-questions，由后端代理真实的 Dify 接口。
+ * 首屏/刷新推荐问题使用 runStarterWorkflow，走 /api/workflows/run（blocking）。
  */
 
 import { apiGetMagnetStage } from '../api/backendClient.js';
@@ -10,6 +11,7 @@ import { getCachedMagnetStageByMagnetId } from './magnetIdService';
 
 // 本地后端代理地址
 const API_URL = '/api/related-questions';
+const WORKFLOW_RUN_URL = '/api/workflows/run';
 
 // cId(magnet_id) -> stage 缓存（避免每次都请求 /api/magnets/:id/stage）
 const stageCache = new Map();
@@ -155,5 +157,61 @@ export async function getRelatedQuestions(cId, conversationId = '') {
   } catch (error) {
     console.error('获取推荐问题时发生错误:', error);
     return [];
+  }
+}
+
+/**
+ * 运行首屏推荐 workflow（blocking）
+ * 用于主流程 chat 的首屏与刷新，以及 MorningBriefing 预加载。
+ *
+ * @param {string|number} magnetId - magnet 表 id（会转为 number）
+ * @returns {Promise<{ answerType: 'recom'|'no_answer', recQuestion?: Array<{ question: string }>, noAnswerTxt?: string }>}
+ */
+export async function runStarterWorkflow(magnetId) {
+  const id = magnetId != null && magnetId !== '' ? Number(magnetId) : 0;
+  if (!id || Number.isNaN(id)) {
+    console.warn('runStarterWorkflow: invalid magnetId', magnetId);
+    return { answerType: 'no_answer', noAnswerTxt: '' };
+  }
+
+  try {
+    const response = await fetch(WORKFLOW_RUN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inputs: { magnet_id: id, stage: '' },
+        response_mode: 'blocking',
+        user: 'abc-123',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('runStarterWorkflow 失败:', response.status, errorText);
+      return { answerType: 'no_answer', noAnswerTxt: '' };
+    }
+
+    const json = await response.json();
+    const outputs = json?.data?.outputs ?? json?.outputs ?? {};
+    const answerType = (outputs.answer_type ?? outputs.answerType ?? 'no_answer').toLowerCase();
+    const recQuestion = Array.isArray(outputs.rec_question)
+      ? outputs.rec_question.slice(0, 3)
+      : Array.isArray(outputs.recQuestion)
+        ? outputs.recQuestion.slice(0, 3)
+        : [];
+    const noAnswerTxt = typeof outputs.no_answer_txt === 'string'
+      ? outputs.no_answer_txt
+      : typeof outputs.noAnswerTxt === 'string'
+        ? outputs.noAnswerTxt
+        : '';
+
+    return {
+      answerType: answerType === 'recom' ? 'recom' : 'no_answer',
+      recQuestion: answerType === 'recom' ? recQuestion : undefined,
+      noAnswerTxt: answerType === 'no_answer' ? noAnswerTxt : undefined,
+    };
+  } catch (error) {
+    console.error('runStarterWorkflow 发生错误:', error);
+    return { answerType: 'no_answer', noAnswerTxt: '' };
   }
 }

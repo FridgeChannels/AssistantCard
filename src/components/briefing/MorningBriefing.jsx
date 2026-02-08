@@ -10,84 +10,22 @@ function playIndexStorageKey(snOrCId, configId) {
     if (id == null || configId == null) return null;
     return `${PLAY_INDEX_KEY_PREFIX}${id}_${configId}`;
 }
-import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
+import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 import { Glass } from '../layout/Glass';
 import { LocationSelector } from './LocationSelector';
 import { ZipCodeOnboarding } from './ZipCodeOnboarding';
 
-// Chat with Leo 按钮显示条件：需同时具备以下三个权限
-const CHAT_WITH_LEO_PERMISSIONS = [
-    'MOD_MOD_ASSISTANT',
-    'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
-    'METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE',
-];
-// Assistant Prompt 按钮显示条件：需同时具备以下三个权限
-const ASSISTANT_PROMPT_PERMISSIONS = [
-    'MOD_MOD_ASSISTANT',
-    'FUNC_FUNC_ASSISTANT_CUSTOM_PROMT',
-    'METHOD_METHOD_ASSISTANT_CUSTOM_PROMT',
-];
-// chat_url 按钮显示条件：需同时具备以下三个权限
-const CHAT_URL_PERMISSIONS = [
-    'MOD_MOD_ASSISTANT',
-    'FUNC_FUNC_ASSISTANT_CHAT_URL',
-    'METHOD_METHOD_ASSISTANT_CHAT_URL',
-];
-// skip_url 按钮显示条件：需同时具备以下三个权限，且 skip_url 不为空
-const SKIP_URL_PERMISSIONS = [
-    'MOD_MOD_CTA',
-    'FUNC_FUNC_CTA_ROUTE',
-    'METHOD_METHOD_CTA_SKIP',
-];
-// phone、SMS、email 按钮显示条件：需同时具备以下三个权限，且对应字段值不为空
-const CTA_CONTACT_PERMISSIONS = [
-    'MOD_MOD_CTA',
-    'FUNC_FUNC_CTA_ROUTE',
-    'METHOD_METHOD_CTA_CONTACT',
-];
-
-function normalizePermissionSet(permissions = []) {
-    const list = Array.isArray(permissions) ? permissions : [];
-    const set = new Set();
-    list.forEach((perm) => {
-        if (!perm) return;
-        set.add(perm);
-        const match = perm.match(/^(MOD|FUNC|METHOD)_(.+)$/);
-        if (!match) return;
-        const prefix = match[1];
-        const rest = match[2];
-        if (rest.startsWith(`${prefix}_`)) {
-            // Handle double-prefixed permissions by adding single-prefixed variant
-            set.add(`${prefix}_${rest.slice(prefix.length + 1)}`);
-        } else {
-            // Handle single-prefixed permissions by adding double-prefixed variant
-            set.add(`${prefix}_${prefix}_${rest}`);
-        }
-    });
-    return set;
-}
-
-function hasAllPermissions(permissionSet, required = []) {
-    if (!required.length) return false;
-    const set = permissionSet instanceof Set ? permissionSet : normalizePermissionSet(permissionSet);
-    return required.every((p) => set.has(p));
-}
-
-// 检查是否包含任何 Assistant 相关权限
-function hasAnyAssistantPermission(permissionSet) {
-    const set = permissionSet instanceof Set ? permissionSet : normalizePermissionSet(permissionSet);
-    const assistantPermissions = [
-        'MOD_MOD_ASSISTANT',
-        'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
-        'METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE',
-        'FUNC_FUNC_ASSISTANT_CHAT_URL',
-        'METHOD_METHOD_ASSISTANT_CHAT_URL',
-        'FUNC_FUNC_ASSISTANT_CUSTOM_PROMT',
-        'METHOD_METHOD_ASSISTANT_CUSTOM_PROMT'
-    ];
-    return assistantPermissions.some(p => set.has(p));
-}
+import {
+    CHAT_WITH_LEO_PERMISSIONS,
+    ASSISTANT_PROMPT_PERMISSIONS,
+    CHAT_URL_PERMISSIONS,
+    SKIP_URL_PERMISSIONS,
+    CTA_CONTACT_PERMISSIONS,
+    normalizePermissionSet,
+    hasAllPermissions,
+    hasAnyAssistantPermission,
+} from '../../lib/ctaPermissions';
 
 export function MorningBriefing({
     onTalkToAssistant,
@@ -97,6 +35,7 @@ export function MorningBriefing({
     magnetContext = null,
     hasPreloaded = false,
     onQuestionsPreloaded,
+    onStarterNoAnswerTxt,
     cachedPlayContent = null,
     isLoadingPlayContent = false,
     onPlayContentLoaded,
@@ -149,29 +88,25 @@ export function MorningBriefing({
     const day = baseDate.getDate();
     const dateString = `${dayName}, ${monthName} ${day}`;
 
-    // 懒加载推荐问题：页面加载时立即触发（如果还没有加载过）
+    // 懒加载推荐问题：调用 workflow run（blocking），recom 时传问题列表，no_answer 时传首条助手文案
     useEffect(() => {
-        // tp/:id 等场景可以通过 disableRelatedQuestions 关闭该逻辑
-        if (disableRelatedQuestions) {
+        if (disableRelatedQuestions || hasPreloadedQuestions.current || hasPreloaded || !cId) {
             return;
         }
-
-        // 如果已经加载过，不再重复加载
-        if (hasPreloadedQuestions.current || hasPreloaded || !cId) {
-            return;
-        }
-
-        // 立即调用接口A获取推荐问题（懒加载）
-        hasPreloadedQuestions.current = true; // 标记已调用
-        getRelatedQuestions(cId, '').then(questions => {
-            if (questions && questions.length > 0 && onQuestionsPreloaded) {
-                onQuestionsPreloaded(questions);
-            }
-        }).catch(error => {
-            console.error('获取推荐问题失败:', error);
-            hasPreloadedQuestions.current = false; // 失败时重置，允许重试
-        });
-    }, [cId, hasPreloaded, onQuestionsPreloaded, disableRelatedQuestions]);
+        hasPreloadedQuestions.current = true;
+        runStarterWorkflow(cId)
+            .then(({ answerType, recQuestion = [], noAnswerTxt = '' }) => {
+                if (answerType === 'recom' && recQuestion.length > 0 && onQuestionsPreloaded) {
+                    onQuestionsPreloaded(recQuestion.map(r => (r && r.question) || r).slice(0, 3));
+                } else if (answerType === 'no_answer' && onStarterNoAnswerTxt) {
+                    onStarterNoAnswerTxt(noAnswerTxt);
+                }
+            })
+            .catch(error => {
+                console.error('预加载推荐 workflow 失败:', error);
+                hasPreloadedQuestions.current = false;
+            });
+    }, [cId, hasPreloaded, onQuestionsPreloaded, onStarterNoAnswerTxt, disableRelatedQuestions]);
 
     // 如果有缓存的播放内容，直接使用（支持 list 响应与旧单条缓存）
     useEffect(() => {

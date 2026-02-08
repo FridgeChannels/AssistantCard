@@ -12,10 +12,10 @@ import { History } from './components/history/History';
 import { AssistantPromptChat } from './components/briefing/AssistantPromptChat';
 import { sendChatMessageStream, sendAssistantPromptMessageStream } from './lib/chatService';
 import { getAgentInfo } from './lib/agentService';
-import { getRelatedQuestions } from './lib/relatedQuestionsService';
 import { updateMagnetZip } from './lib/locationService';
 import { logUserAction, logChatMessage } from './lib/loggingService';
 import { pageTimeTracker } from './lib/pageTimeTracker';
+import { getHeaderCta } from './lib/ctaPermissions';
 import { Info, ArrowLeft } from 'lucide-react';
 
 /**
@@ -53,6 +53,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
   const [agentInfo, setAgentInfo] = useState({ phone: '', email: '', name: 'James' }); // 代理联系信息
   const [starterQuestions, setStarterQuestions] = useState([]); // 存储预加载的推荐问题
   const [isLoadingStarterQuestions, setIsLoadingStarterQuestions] = useState(false); // 推荐问题加载状态
+  const [starterNoAnswerTxt, setStarterNoAnswerTxt] = useState(null); // 预加载/首屏返回 no_answer 时存文案，进 chat 时插入首条助手消息
   const hasPreloadedQuestionsRef = useRef(false); // 标记是否已经懒加载过推荐问题
   const playContentCacheRef = useRef(null); // 缓存播放内容，避免重复请求
   const isLoadingPlayContentRef = useRef(false); // 标记是否正在加载播放内容，防止并发请求
@@ -105,11 +106,21 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     setCurrentAnswer('');
     streamPrefixCheckedRef.current = false;
     setStarterQuestions([]); // 重置推荐问题
+    setStarterNoAnswerTxt(null); // 重置 no_answer 首条文案
     hasPreloadedQuestionsRef.current = false; // 重置懒加载标记
     playContentCacheRef.current = null; // 重置播放内容缓存（cId变化时需要重新加载）
     isLoadingPlayContentRef.current = false; // 重置加载状态
     prevChatHistoryLengthRef.current = 0; // 重置历史长度记录
   }, [userRole, cId]);
+
+  // 预加载得到 no_answer 时：进入 chat 且历史为空则自动插入首条助手消息
+  useEffect(() => {
+    if (page !== 'chat' || chatHistory.length !== 0) return;
+    const txt = starterNoAnswerTxt != null && String(starterNoAnswerTxt).trim() !== '' ? starterNoAnswerTxt : null;
+    if (!txt) return;
+    setChatHistory([{ question: '', answer: { text: txt, type: 'result' } }]);
+    setStarterNoAnswerTxt(null);
+  }, [page, chatHistory.length, starterNoAnswerTxt]);
 
   // 获取代理信息
   useEffect(() => {
@@ -236,31 +247,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     setCurrentAnswer('');
     streamPrefixCheckedRef.current = false;
 
-    // 立即开始获取推荐问题（接口A）- 在回答渲染时就开始请求
-    getRelatedQuestions(cId, conversationId).then(questions => {
-      if (questions && questions.length > 0) {
-        // 更新最后一条消息的推荐问题
-        setChatHistory(prev => {
-          const newHistory = [...prev];
-          if (newHistory.length > 0) {
-            const currentAnswer = newHistory[newHistory.length - 1].answer || {};
-            newHistory[newHistory.length - 1] = {
-              ...newHistory[newHistory.length - 1],
-              answer: {
-                ...currentAnswer,
-                relatedQuestions: questions,
-              }
-            };
-          }
-          return newHistory;
-        });
-      }
-    }).catch(error => {
-      console.error('获取推荐问题失败:', error);
-      // 失败时不显示推荐问题（不设置默认值）
-    });
-
-// 根据当前页面选择API
+    // 根据当前页面选择API
     const isAssistantPromptChat = page === 'assistantPromptChat';
     const chatApiFunction = isAssistantPromptChat ? sendAssistantPromptMessageStream : sendChatMessageStream;
     
@@ -488,9 +475,12 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                 cachedPlayContent={playContentCacheRef.current}
                 isLoadingPlayContent={isLoadingPlayContentRef.current}
                 onQuestionsPreloaded={(questions) => {
-                  // 预加载的推荐问题存储到App状态中
                   setStarterQuestions(questions);
-                  hasPreloadedQuestionsRef.current = true; // 标记已加载
+                  hasPreloadedQuestionsRef.current = true;
+                }}
+                onStarterNoAnswerTxt={(noAnswerTxt) => {
+                  setStarterNoAnswerTxt(noAnswerTxt);
+                  hasPreloadedQuestionsRef.current = true; // 预加载完成（no_answer 也算完成）
                 }}
                 onPlayContentLoaded={(content) => {
                   // 缓存播放内容
@@ -551,7 +541,9 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
               isLoadingStarterQuestions={isLoadingStarterQuestions}
               conversationId={conversationId}
               cId={cId}
-              hasInitialRecommendations={false} // 不显示初始推荐问题
+              hasInitialRecommendations={false}
+              magnetContext={magnetContext}
+              onOpenContact={() => setIsSheetOpen(true)}
             />
           ) : (
             <motion.div
@@ -585,12 +577,28 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                     <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Concierge Leo</span>
                   </div>
                 </div>
+                {/* Header CTA：chat_url > skip_url > 联系；无 magnetContext.cta 或权限不通过则不展示 */}
+                {(() => {
+                  const headerCta = getHeaderCta(magnetContext?.cta, magnetContext?.solution?.permissions);
+                  if (!headerCta) return null;
+                  const isContact = headerCta.type === 'contact';
+                  const btnClass = 'px-4 py-2 rounded-full text-sm font-medium text-sothebys-navy bg-white/20 backdrop-blur-[20px] hover:bg-white/40 transition-colors border border-gray-200/40';
+                  return isContact ? (
+                    <button type="button" onClick={() => setIsSheetOpen(true)} className={btnClass}>
+                      {headerCta.label}
+                    </button>
+                  ) : (
+                    <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
+                      {headerCta.label}
+                    </a>
+                  );
+                })()}
               </header>
 
               {/* Scrollable Chat Area */}
               <div className="flex-1 overflow-y-auto px-0 py-6 space-y-2 no-scrollbar scroll-smooth min-h-0">
-                {/* Empty State: Center Content */}
-                {chatHistory.length === 0 && (
+                {/* Empty State: Center Content（有 starterNoAnswerTxt 时不展示，由 effect 插入首条助手消息） */}
+                {chatHistory.length === 0 && !starterNoAnswerTxt && (
                   <div className="h-full flex flex-col justify-center items-center pb-32 min-h-0">
                     {/* Welcome Icon */}
                     <div className="mb-6">
@@ -612,6 +620,9 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                       isLoadingPreloaded={isLoadingStarterQuestions}
                       onQuestionsLoaded={setStarterQuestions}
                       onLoadingChange={setIsLoadingStarterQuestions}
+                      onNoAnswer={(noAnswerTxt) => {
+                        setChatHistory([{ question: '', answer: { text: noAnswerTxt, type: 'result' } }]);
+                      }}
                     />
                   </div>
                 )}

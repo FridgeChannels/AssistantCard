@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
-import { getRelatedQuestions } from '../../lib/relatedQuestionsService';
+import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { logUserAction } from '../../lib/loggingService';
 import { Glass } from '../layout/Glass';
 
@@ -13,7 +13,8 @@ export function StarterQuestions({
     isLoadingPreloaded = false,
     onQuestionsLoaded,
     onLoadingChange,
-    skipFetch = false, // tp/:id 等场景不调用 api/related-questions
+    onNoAnswer, // no_answer 时写入首条助手消息（仅 App 主流程 chat 传入）
+    skipFetch = false, // tp/:id 等场景不调用推荐接口
 }) {
     const [questions, setQuestions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -51,24 +52,26 @@ export function StarterQuestions({
                 return;
             }
 
-            // 如果没有预加载的问题，才发起请求
+            // 无预加载时调用 workflow run（blocking）
             setIsLoading(true);
             if (onLoadingChange) onLoadingChange(true);
-            hasFetched.current = true; // 标记已调用
+            hasFetched.current = true;
             try {
-                const relatedQuestions = await getRelatedQuestions(cId, conversationId);
-                if (relatedQuestions && relatedQuestions.length > 0) {
-                    setQuestions(relatedQuestions);
-                    if (onQuestionsLoaded) {
-                        onQuestionsLoaded(relatedQuestions);
-                    }
+                const { answerType, recQuestion = [], noAnswerTxt = '' } = await runStarterWorkflow(cId);
+                if (answerType === 'recom' && recQuestion.length > 0) {
+                    const qs = recQuestion.map(r => (r && r.question) || r).slice(0, 3);
+                    setQuestions(qs);
+                    if (onQuestionsLoaded) onQuestionsLoaded(qs);
+                } else if (answerType === 'no_answer' && onNoAnswer) {
+                    onNoAnswer(noAnswerTxt);
+                    setQuestions([]);
                 } else {
                     setQuestions([]);
                 }
             } catch (error) {
                 console.error('获取推荐问题失败:', error);
                 setQuestions([]);
-                hasFetched.current = false; // 失败时重置，允许重试
+                hasFetched.current = false;
             } finally {
                 setIsLoading(false);
                 if (onLoadingChange) onLoadingChange(false);
@@ -94,15 +97,17 @@ export function StarterQuestions({
     }, [cId, conversationId]);
 
     const handleRefresh = () => {
-        if (skipFetch || !cId) {
-            return;
-        }
-
+        if (skipFetch || !cId) return;
         setIsLoading(true);
-        getRelatedQuestions(cId, conversationId)
-            .then(relatedQuestions => {
-                if (relatedQuestions && relatedQuestions.length > 0) {
-                    setQuestions(relatedQuestions);
+        runStarterWorkflow(cId)
+            .then(({ answerType, recQuestion = [], noAnswerTxt = '' }) => {
+                if (answerType === 'recom' && recQuestion.length > 0) {
+                    const qs = recQuestion.map(r => (r && r.question) || r).slice(0, 3);
+                    setQuestions(qs);
+                    if (onQuestionsLoaded) onQuestionsLoaded(qs);
+                } else if (answerType === 'no_answer' && onNoAnswer) {
+                    onNoAnswer(noAnswerTxt);
+                    setQuestions([]);
                 } else {
                     setQuestions([]);
                 }
@@ -111,9 +116,7 @@ export function StarterQuestions({
                 console.error('获取推荐问题失败:', error);
                 setQuestions([]);
             })
-            .finally(() => {
-                setIsLoading(false);
-            });
+            .finally(() => setIsLoading(false));
     };
 
     const currentQuestions = questions.length > 0 ? questions : [];

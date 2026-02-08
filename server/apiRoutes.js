@@ -11,6 +11,10 @@ const DOCUMENT_SUMMARY_API_URL =
   process.env.DOCUMENT_SUMMARY_API_URL || process.env.VITE_DOCUMENT_SUMMARY_API_URL;
 const DOCUMENT_SUMMARY_API_TOKEN =
   process.env.DOCUMENT_SUMMARY_API_TOKEN || process.env.VITE_DOCUMENT_SUMMARY_API_TOKEN;
+const WORKFLOW_RUN_URL =
+  process.env.WORKFLOW_RUN_URL || process.env.VITE_WORKFLOW_RUN_URL;
+const WORKFLOW_RUN_TOKEN =
+  process.env.WORKFLOW_RUN_TOKEN || process.env.VITE_WORKFLOW_RUN_TOKEN;
 
 function setCacheSeconds(res, seconds, staleWhileRevalidateSeconds = 0) {
   const parts = [`public`, `max-age=${Math.max(0, seconds | 0)}`];
@@ -239,6 +243,39 @@ export function registerApiRoutes(app, supabase) {
     } catch (error) {
       console.error('Proxy Related Questions API failed:', error);
       return res.status(500).json({ error: 'Failed to call Related Questions API' });
+    }
+  });
+
+  // ---------------- Workflow Run API proxy (starter questions: blocking) ----------------
+  app.post('/api/workflows/run', async (req, res) => {
+    if (!WORKFLOW_RUN_URL || !WORKFLOW_RUN_TOKEN) {
+      console.error('WORKFLOW_RUN_URL or WORKFLOW_RUN_TOKEN is not configured');
+      return res.status(500).json({ error: 'Workflow Run API is not configured on server' });
+    }
+
+    const payload = req.body || {};
+
+    try {
+      const upstreamResponse = await fetch(WORKFLOW_RUN_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${WORKFLOW_RUN_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!upstreamResponse.ok) {
+        const errorText = await upstreamResponse.text();
+        console.error('Upstream Workflow Run API error:', upstreamResponse.status, errorText);
+        return res.status(upstreamResponse.status).send(errorText);
+      }
+
+      const json = await upstreamResponse.json();
+      res.status(upstreamResponse.status).json(json);
+    } catch (error) {
+      console.error('Proxy Workflow Run API failed:', error);
+      return res.status(500).json({ error: 'Failed to call Workflow Run API' });
     }
   });
 

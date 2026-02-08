@@ -5,6 +5,7 @@ import { AnswerCard } from '../cards/AnswerCard';
 import { InputSection } from '../interaction/InputSection';
 import { StarterQuestions } from '../chat/StarterQuestions';
 import { Glass } from '../layout/Glass';
+import { getHeaderCta } from '../../lib/ctaPermissions';
 
 export function AssistantPromptChat({
   chatHistory,
@@ -21,7 +22,9 @@ export function AssistantPromptChat({
   isLoadingStarterQuestions,
   conversationId,
   cId,
-  hasInitialRecommendations = false // 当为true时显示初始推荐问题，否则不显示
+  hasInitialRecommendations = false,
+  magnetContext = null, // CTA 数据与权限，用于 header 右侧单按钮
+  onOpenContact, // 联系类 CTA 时打开 TextMeSheet 的回调
 }) {
   const isChatEmpty = chatHistory.length === 0;
 
@@ -58,6 +61,22 @@ export function AssistantPromptChat({
             <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Assistant Prompt</span>
           </div>
         </div>
+        {/* Header CTA：chat_url > skip_url > 联系，无数据或无权限不展示 */}
+        {(() => {
+          const headerCta = getHeaderCta(magnetContext?.cta, magnetContext?.solution?.permissions);
+          if (!headerCta) return null;
+          const isContact = headerCta.type === 'contact';
+          const btnClass = 'px-4 py-2 rounded-full text-sm font-medium text-sothebys-navy bg-white/20 backdrop-blur-[20px] hover:bg-white/40 transition-colors border border-gray-200/40';
+          return isContact ? (
+            <button type="button" onClick={() => onOpenContact?.()} className={btnClass}>
+              {headerCta.label}
+            </button>
+          ) : (
+            <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
+              {headerCta.label}
+            </a>
+          );
+        })()}
       </header>
 
       {/* Scrollable Chat Area */}

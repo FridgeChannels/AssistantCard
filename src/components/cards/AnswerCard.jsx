@@ -8,21 +8,26 @@ import { Glass } from '../layout/Glass';
 export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef }) {
     if (!answer) return null;
 
+    // no_answer 首条助手消息：无用户问题时不渲染用户气泡，只显示助手一段话
+    const showUserBubble = question != null && String(question).trim() !== '';
+
     return (
         <div className="px-5 py-2 pb-4 space-y-4">
 
-            {/* User Bubble */}
-            <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="flex justify-end items-end gap-2"
-            >
-                <div className="bg-blue-50/80 backdrop-blur-[12px] border border-blue-100/50 text-[#010101] px-5 py-3 rounded-[24px] rounded-br-sm shadow-[0_8px_20px_rgba(0,122,255,0.15)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium relative overflow-hidden">
-                    {/* Inner highlight for glass feel */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent pointer-events-none" />
-                    <div className="relative z-10">{question}</div>
-                </div>
-            </motion.div>
+            {/* User Bubble - 仅在有 question 时显示（no_answer 首条不显示） */}
+            {showUserBubble && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    className="flex justify-end items-end gap-2"
+                >
+                    <div className="bg-blue-50/80 backdrop-blur-[12px] border border-blue-100/50 text-[#010101] px-5 py-3 rounded-[24px] rounded-br-sm shadow-[0_8px_20px_rgba(0,122,255,0.15)] max-w-[85%] text-[17px] leading-snug tracking-tight font-medium relative overflow-hidden">
+                        {/* Inner highlight for glass feel */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent pointer-events-none" />
+                        <div className="relative z-10">{question}</div>
+                    </div>
+                </motion.div>
+            )}
 
             {/* Assistant Bubble - 答案开始位置标记 */}
             <motion.div
