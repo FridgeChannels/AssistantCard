@@ -94,7 +94,7 @@ export function MorningBriefing({
             return;
         }
         hasPreloadedQuestions.current = true;
-        runStarterWorkflow(cId)
+        runStarterWorkflow(cId, magnetContext?.industry_id)
             .then(({ answerType, recQuestion = [], noAnswerTxt = '' }) => {
                 if (answerType === 'recom' && recQuestion.length > 0 && onQuestionsPreloaded) {
                     onQuestionsPreloaded(recQuestion.map(r => (r && r.question) || r).slice(0, 3));

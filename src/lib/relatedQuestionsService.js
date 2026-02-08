@@ -165,13 +165,20 @@ export async function getRelatedQuestions(cId, conversationId = '') {
  * 用于主流程 chat 的首屏与刷新，以及 MorningBriefing 预加载。
  *
  * @param {string|number} magnetId - magnet 表 id（会转为 number）
+ * @param {string|number|null|undefined} [industryId] - 行业 id，来自 /api/magnets/by-sn 返回的 industry_id
  * @returns {Promise<{ answerType: 'recom'|'no_answer', recQuestion?: Array<{ question: string }>, noAnswerTxt?: string }>}
  */
-export async function runStarterWorkflow(magnetId) {
+export async function runStarterWorkflow(magnetId, industryId) {
   const id = magnetId != null && magnetId !== '' ? Number(magnetId) : 0;
   if (!id || Number.isNaN(id)) {
     console.warn('runStarterWorkflow: invalid magnetId', magnetId);
     return { answerType: 'no_answer', noAnswerTxt: '' };
+  }
+
+  const industryIdNum = industryId != null && industryId !== '' ? Number(industryId) : null;
+  const inputs = { magnet_id: id, stage: '' };
+  if (industryIdNum != null && !Number.isNaN(industryIdNum)) {
+    inputs.industry_id = industryIdNum;
   }
 
   try {
@@ -179,7 +186,7 @@ export async function runStarterWorkflow(magnetId) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        inputs: { magnet_id: id, stage: '' },
+        inputs,
         response_mode: 'blocking',
         user: 'abc-123',
       }),

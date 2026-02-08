@@ -407,7 +407,7 @@ export function registerApiRoutes(app, supabase) {
           timing.time('sb_industry_solution', () =>
             supabase
               .from('industry_solution')
-              .select('id, studio_entry_route')
+              .select('id, studio_entry_route, industry_id')
               .eq('id', industrySolutionId)
               .maybeSingle(),
           ),
@@ -450,12 +450,17 @@ export function registerApiRoutes(app, supabase) {
           const permissions = [...permSet].sort();
           console.log(`[by-sn] SN=${sn}, industry_solution_id=${industrySolutionId}, permissions count=${permissions.length}, permissions=`, permissions);
 
+          payload.industry_id = solutionRow.industry_id ?? null;
           payload.solution = {
             route: route ?? 'real-estate',
             id: String(solutionRow.id),
             permissions: permissions,
           };
         }
+      }
+
+      if (payload.industry_id === undefined) {
+        payload.industry_id = null;
       }
 
       if (!payload.solution) {
@@ -603,6 +608,7 @@ export function registerApiRoutes(app, supabase) {
       let resolvedMagnetId = null;
       let zipCode = null;
       let industrySolutionId = null;
+      let industryId = null;
       let locationFormatted = null;
 
       if (sn) {
@@ -657,6 +663,13 @@ export function registerApiRoutes(app, supabase) {
         }
       }
 
+      if (industrySolutionId != null) {
+        const { data: isRow } = await timing.time('sb_industry_solution_for_industry_id', () =>
+          supabase.from('industry_solution').select('industry_id').eq('id', industrySolutionId).maybeSingle(),
+        );
+        if (isRow?.industry_id != null) industryId = isRow.industry_id;
+      }
+
       const selectCols = 'id, headline, audio_url';
       const orderOpt = { ascending: false };
 
@@ -667,20 +680,21 @@ export function registerApiRoutes(app, supabase) {
           resolvedMagnetId,
           zipCode,
           industrySolutionId,
+          industryId,
           hasZipCode,
         });
       }
 
       if (zipCode) {
         let byZipQuery = supabase.from('play_news_contents').select(selectCols).eq('zip_code', zipCode);
-        if (industrySolutionId != null) {
-          byZipQuery = byZipQuery.eq('industry_solution_id', industrySolutionId);
+        if (industryId != null) {
+          byZipQuery = byZipQuery.eq('industry_id', industryId);
         }
         if (debug) {
           console.log(
-            '[play-contents] 查询1 条件: zip_code=%s, industry_solution_id=%s',
+            '[play-contents] 查询1 条件: zip_code=%s, industry_id=%s',
             zipCode,
-            industrySolutionId ?? '(未设置)',
+            industryId ?? '(未设置)',
           );
         }
         const { data: byZip, error: zipErr } = await timing.time('sb_play_by_zip', () =>
@@ -707,11 +721,11 @@ export function registerApiRoutes(app, supabase) {
       }
 
       let latestQuery = supabase.from('play_news_contents').select(selectCols);
-      if (industrySolutionId != null) {
-        latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
+      if (industryId != null) {
+        latestQuery = latestQuery.eq('industry_id', industryId);
       }
       if (debug) {
-        console.log('[play-contents] 查询2 条件: industry_solution_id=%s', industrySolutionId ?? '(未设置)');
+        console.log('[play-contents] 查询2 条件: industry_id=%s', industryId ?? '(未设置)');
       }
       const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
         latestQuery.order('created_at', orderOpt).limit(1),
@@ -764,6 +778,7 @@ export function registerApiRoutes(app, supabase) {
       const timing = createServerTiming();
       let magnet = null;
       let industrySolutionId = null;
+      let industryId = null;
 
       if (sn) {
         const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_sn', () =>
@@ -812,6 +827,13 @@ export function registerApiRoutes(app, supabase) {
         if (!mcErr && mc?.industry_solution_id != null) industrySolutionId = mc.industry_solution_id;
       }
 
+      if (industrySolutionId != null) {
+        const { data: isRow } = await timing.time('sb_industry_solution_for_industry_id', () =>
+          supabase.from('industry_solution').select('industry_id').eq('id', industrySolutionId).maybeSingle(),
+        );
+        if (isRow?.industry_id != null) industryId = isRow.industry_id;
+      }
+
       const { data: playConfig, error: configErr } = await timing.time('sb_play_content_config', () =>
         supabase
           .from('magnet_play_content_configs')
@@ -825,8 +847,8 @@ export function registerApiRoutes(app, supabase) {
       if (configErr || !playConfig) {
         const selectCols = 'id, headline, audio_url';
         let latestQuery = supabase.from('play_news_contents').select(selectCols);
-        if (industrySolutionId != null) {
-          latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
+        if (industryId != null) {
+          latestQuery = latestQuery.eq('industry_id', industryId);
         }
         const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
           latestQuery.order('created_at', { ascending: false }).limit(1),
@@ -912,8 +934,8 @@ export function registerApiRoutes(app, supabase) {
 
       const selectColsFallback = 'id, headline, audio_url';
       let fallbackQuery = supabase.from('play_news_contents').select(selectColsFallback);
-      if (industrySolutionId != null) {
-        fallbackQuery = fallbackQuery.eq('industry_solution_id', industrySolutionId);
+      if (industryId != null) {
+        fallbackQuery = fallbackQuery.eq('industry_id', industryId);
       }
       const { data: fallback, error: fallbackErr } = await timing.time('sb_play_fallback', () =>
         fallbackQuery.order('created_at', { ascending: false }).limit(1),

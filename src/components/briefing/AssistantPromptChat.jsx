@@ -104,6 +104,7 @@ export function AssistantPromptChat({
               isLoadingPreloaded={isLoadingStarterQuestions}
               onQuestionsLoaded={setStarterQuestions}
               onLoadingChange={setIsLoadingStarterQuestions}
+              industryId={magnetContext?.industry_id}
             />
           </div>
         )}

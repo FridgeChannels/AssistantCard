@@ -623,6 +623,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                       onNoAnswer={(noAnswerTxt) => {
                         setChatHistory([{ question: '', answer: { text: noAnswerTxt, type: 'result' } }]);
                       }}
+                      industryId={magnetContext?.industry_id}
                     />
                   </div>
                 )}

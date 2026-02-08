@@ -15,6 +15,7 @@ export function StarterQuestions({
     onLoadingChange,
     onNoAnswer, // no_answer 时写入首条助手消息（仅 App 主流程 chat 传入）
     skipFetch = false, // tp/:id 等场景不调用推荐接口
+    industryId, // 来自 /api/magnets/by-sn 的 industry_id，会传给 workflows/run 的 inputs
 }) {
     const [questions, setQuestions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +58,7 @@ export function StarterQuestions({
             if (onLoadingChange) onLoadingChange(true);
             hasFetched.current = true;
             try {
-                const { answerType, recQuestion = [], noAnswerTxt = '' } = await runStarterWorkflow(cId);
+                const { answerType, recQuestion = [], noAnswerTxt = '' } = await runStarterWorkflow(cId, industryId);
                 if (answerType === 'recom' && recQuestion.length > 0) {
                     const qs = recQuestion.map(r => (r && r.question) || r).slice(0, 3);
                     setQuestions(qs);
@@ -80,7 +81,7 @@ export function StarterQuestions({
 
         fetchQuestions();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cId, conversationId, skipFetch]);
+    }, [cId, conversationId, skipFetch, industryId]);
 
     // 当预加载的问题更新时，更新本地状态
     useEffect(() => {
@@ -99,7 +100,7 @@ export function StarterQuestions({
     const handleRefresh = () => {
         if (skipFetch || !cId) return;
         setIsLoading(true);
-        runStarterWorkflow(cId)
+        runStarterWorkflow(cId, industryId)
             .then(({ answerType, recQuestion = [], noAnswerTxt = '' }) => {
                 if (answerType === 'recom' && recQuestion.length > 0) {
                     const qs = recQuestion.map(r => (r && r.question) || r).slice(0, 3);
