@@ -19,4 +19,8 @@ export const env = {
     // Document Summary API configuration
     DOCUMENT_SUMMARY_API_URL: window.ENV?.VITE_DOCUMENT_SUMMARY_API_URL || import.meta.env.VITE_DOCUMENT_SUMMARY_API_URL || '',
     DOCUMENT_SUMMARY_API_TOKEN: window.ENV?.VITE_DOCUMENT_SUMMARY_API_TOKEN || import.meta.env.VITE_DOCUMENT_SUMMARY_API_TOKEN || '',
+
+    // Assistant Prompt API configuration（流式对话等）
+    ASSISTANT_PROMPT_API_URL: window.ENV?.VITE_ASSISTANT_PROMPT_API_URL || import.meta.env.VITE_ASSISTANT_PROMPT_API_URL || '',
+    ASSISTANT_PROMPT_API_TOKEN: window.ENV?.VITE_ASSISTANT_PROMPT_API_TOKEN || import.meta.env.VITE_ASSISTANT_PROMPT_API_TOKEN || '',
 };

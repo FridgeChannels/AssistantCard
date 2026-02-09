@@ -48,6 +48,8 @@ docker run -d \
   # -e VITE_SUPABASE_ANON_KEY="your-anon-key" \
   -e VITE_CHAT_API_URL="https://your-api.com/v1/chat-messages" \
   -e VITE_CHAT_API_TOKEN="your-token" \
+  -e VITE_ASSISTANT_PROMPT_API_URL="https://your-api.com/v1/chat-messages" \
+  -e VITE_ASSISTANT_PROMPT_API_TOKEN="your-token" \
   -e VITE_RELATED_QUESTIONS_API_URL="https://your-api.com/v1/chat-messages" \
   -e VITE_RELATED_QUESTIONS_API_TOKEN="your-token" \
   -e VITE_DOCUMENT_SUMMARY_API_URL="https://your-api.com/v1/chat-messages" \
@@ -65,6 +67,8 @@ docker run -d \
 | `VITE_SUPABASE_ANON_KEY` | （可选）旧版前端 Supabase 匿名密钥 | 否 |
 | `VITE_CHAT_API_URL` | 聊天 API 端点 | 是 |
 | `VITE_CHAT_API_TOKEN` | 聊天 API 令牌 | 是 |
+| `VITE_ASSISTANT_PROMPT_API_URL` | Assistant 流式对话 API 端点 | 是 |
+| `VITE_ASSISTANT_PROMPT_API_TOKEN` | Assistant 流式对话 API 令牌 | 是 |
 | `VITE_RELATED_QUESTIONS_API_URL` | 相关问题 API 端点 | 是 |
 | `VITE_RELATED_QUESTIONS_API_TOKEN` | 相关问题 API 令牌 | 是 |
 | `VITE_DOCUMENT_SUMMARY_API_URL` | 文档摘要 API 端点 | 是 |

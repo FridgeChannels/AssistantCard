@@ -3,11 +3,13 @@
  * 前端只调用本地 /api/chat-messages，由后端代理请求真实的 Chat API
  */
 
+import { env } from '../config/env.js';
+
 const API_URL = '/api/chat-messages';
 
-// Assistant API Configuration from environment variables
-const ASSISTANT_PROMPT_API_URL = import.meta.env.VITE_ASSISTANT_PROMPT_API_URL;
-const ASSISTANT_PROMPT_API_TOKEN = import.meta.env.VITE_ASSISTANT_PROMPT_API_TOKEN;
+// Assistant API 从统一 env 读取（支持 Docker 运行时注入）
+const ASSISTANT_PROMPT_API_URL = env.ASSISTANT_PROMPT_API_URL;
+const ASSISTANT_PROMPT_API_TOKEN = env.ASSISTANT_PROMPT_API_TOKEN;
 
 /**
  * Send a chat message and handle streaming response
