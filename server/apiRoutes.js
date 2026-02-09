@@ -488,6 +488,24 @@ export function registerApiRoutes(app, supabase) {
         payload.assistant_function_code = configRow.assistant_function_code || null;
       }
 
+      // 当 assistant_function_code 为 FUNC_ASSISTANT_CHAT_URL 时，chat_url 使用 assistant_config 的值
+      if (configRow?.assistant_function_code === 'FUNC_ASSISTANT_CHAT_URL' && configRow?.assistant_config) {
+        const effectiveChatUrl = String(configRow.assistant_config).trim() || null;
+        if (effectiveChatUrl) {
+          if (payload.cta) {
+            payload.cta.chat_url = effectiveChatUrl;
+          } else {
+            payload.cta = {
+              phone: '',
+              email: '',
+              name: 'James',
+              skip_url: null,
+              chat_url: effectiveChatUrl,
+            };
+          }
+        }
+      }
+
       const industrySolutionId = configRow?.industry_solution_id ?? null;
       if (industrySolutionId) {
         const [{ data: solutionRow }, { data: configList, error: configListError }] = await Promise.all([
