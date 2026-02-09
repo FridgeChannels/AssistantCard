@@ -1,15 +1,10 @@
 /**
  * Chat API Service
- * 前端只调用本地 /api/chat-messages，由后端代理请求真实的 Chat API
+ * 前端只调用本地 API，由后端代理请求真实的 Chat / Assistant API（不直接请求 kno.fridgechannels.com）
  */
 
-import { env } from '../config/env.js';
-
 const API_URL = '/api/chat-messages';
-
-// Assistant API 从统一 env 读取（支持 Docker 运行时注入）
-const ASSISTANT_PROMPT_API_URL = env.ASSISTANT_PROMPT_API_URL;
-const ASSISTANT_PROMPT_API_TOKEN = env.ASSISTANT_PROMPT_API_TOKEN;
+const ASSISTANT_CHAT_API_URL = '/api/assistant-chat-messages';
 
 /**
  * Send a chat message and handle streaming response
@@ -431,18 +426,6 @@ export async function sendAssistantPromptMessageStream(
   agentName = '',
   assistantConfig = null
 ) {
-  if (!ASSISTANT_PROMPT_API_URL) {
-    const error = new Error('Assistant API URL is not configured. Please set VITE_ASSISTANT_PROMPT_API_URL in environment variables.');
-    onError?.(error);
-    return;
-  }
-
-  if (!ASSISTANT_PROMPT_API_TOKEN) {
-    const error = new Error('Assistant API Token is not configured. Please set VITE_ASSISTANT_PROMPT_API_TOKEN in environment variables.');
-    onError?.(error);
-    return;
-  }
-
   try {
     const debugStream =
       typeof window !== 'undefined' &&
@@ -451,12 +434,10 @@ export async function sendAssistantPromptMessageStream(
     const streamStartAt = Date.now();
     let lastChunkAt = streamStartAt;
     
-    const response = await fetch(ASSISTANT_PROMPT_API_URL, {
+    const response = await fetch(ASSISTANT_CHAT_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ASSISTANT_PROMPT_API_TOKEN}`,
-        'User-Agent': 'FC-Assistant/1.0'
       },
       body: JSON.stringify({
         inputs: {
