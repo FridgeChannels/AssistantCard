@@ -10,7 +10,7 @@
 
 | 页面 | 文件 | 当前 header 结构 |
 |------|------|------------------|
-| **主流程 Chat** | `App.jsx` 约 556–577 行 | 左侧 [返回] + [L + “Concierge Leo”]，**右侧无内容**（无 justify-between） |
+| **主流程 Chat** | `App.jsx` 约 556–577 行 | 左侧 [返回] + [L + “Bruce Lee”]，**右侧无内容**（无 justify-between） |
 | **Assistant Prompt** | `AssistantPromptChat.jsx` 约 39–61 行 | 左侧 [返回] + [L + “Assistant Prompt”]，**右侧无内容**（已有 justify-between，但右侧无节点） |
 | **Tp 页 Chat** | `TpPage.jsx` | 本次**不改**。 |
 

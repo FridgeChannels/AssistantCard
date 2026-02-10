@@ -372,8 +372,8 @@ function TpPage({ cId = '', contentPlay = null }) {
                     <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
                   </button>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">L</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Concierge Leo</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">B</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Bruce Lee</span>
                   </div>
                 </div>
               </header>

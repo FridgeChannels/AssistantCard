@@ -319,8 +319,9 @@ export function MorningBriefing({
                 };
                 setPlayContent(content);
 
-                const skipped = localStorage.getItem('zip_onboarding_skipped');
-                if (!hasZip && !skipped) setShowOnboarding(true);
+                // zipcode 引导弹窗已隐藏，不再根据 hasZip 弹出
+                // const skipped = localStorage.getItem('zip_onboarding_skipped');
+                // if (!hasZip && !skipped) setShowOnboarding(true);
 
                 if (onPlayContentLoaded) {
                     const payload = longTextDisplayIndex != null
@@ -485,8 +486,8 @@ export function MorningBriefing({
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">L</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">Concierge Leo</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">B</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight">Bruce Lee</span>
                 </div>
             </header>
 
@@ -701,8 +702,8 @@ export function MorningBriefing({
                         </motion.div>
                     )}
 
-                    {/* Location Selector or Formatted Text */}
-                    {!hideLocationSelector && !showOnboarding && (
+                    {/* Location Selector / zipcode 输入与展示已隐藏 */}
+                    {false && !hideLocationSelector && !showOnboarding && (
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
@@ -760,7 +761,7 @@ export function MorningBriefing({
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
+                                                        <span className="text-base font-medium text-[#010101]">Bruce Lee</span>
                                                     </button>
                                                 </Glass>
                                             )}
