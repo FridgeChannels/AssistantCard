@@ -646,6 +646,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                       }}
                       agentName={agentInfo.name}
                       answerStartRef={isLastMessage ? answerStartRef : null}
+                      assistantLabel={magnetContext?.assistant_prompt_label}
                       onNotNow={() => {
                         // Hide the button by updating the answer
                         setChatHistory(prev => {

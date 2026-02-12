@@ -1,11 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, MessageSquare, User } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
 import { Glass } from '../layout/Glass';
 
-export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef }) {
+/**
+ * @param {string} [assistantLabel] - Assistant name/label; first character used for avatar badge (default 'L')
+ */
+export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef, assistantLabel }) {
     if (!answer) return null;
 
     // no_answer 首条助手消息：无用户问题时不渲染用户气泡，只显示助手一段话
@@ -37,13 +40,9 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 transition={{ delay: 0.1 }}
                 className="flex items-start gap-3"
             >
-                {/* Assistant Avatar - Smaller & Subtler */}
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-white shadow-sm ring-1 ring-gray-100 flex items-center justify-center flex-none mt-1">
-                    <img
-                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
-                        alt="Agent"
-                        className="w-full h-full object-cover"
-                    />
+                {/* Assistant Avatar - 首字母徽章（圆形） */}
+                <div className="w-7 h-7 rounded-full bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs shadow-lg flex-none mt-1" aria-label="Agent">
+                    {(assistantLabel?.[0] || 'L').toUpperCase()}
                 </div>
 
                 {/* Answer Content */}
