@@ -451,7 +451,7 @@ export function registerApiRoutes(app, supabase) {
         ? timing.time('sb_magnet_config', () =>
             supabase
               .from('magnet_config')
-              .select('industry_solution_id, assistant_config, assistant_function_code')
+              .select('industry_solution_id, assistant_config, assistant_function_code, assistant_prompt_label, background_image_url')
               .eq('id', magnetRow.magnet_config_id)
               .maybeSingle(),
           )
@@ -482,10 +482,12 @@ export function registerApiRoutes(app, supabase) {
         console.error('Error querying magnet_config:', configError);
       }
 
-      // 添加 assistant_config 和 assistant_function_code 到响应中 (即使为空也要返回)
+      // 添加 assistant_config、assistant_function_code、assistant_prompt_label、background_image_url 到响应中 (即使为空也要返回)
       if (configRow) {
         payload.assistant_config = configRow.assistant_config || null;
         payload.assistant_function_code = configRow.assistant_function_code || null;
+        payload.assistant_prompt_label = configRow.assistant_prompt_label ?? null;
+        payload.background_image_url = configRow.background_image_url ?? null;
       }
 
       // 当 assistant_function_code 为 FUNC_ASSISTANT_CHAT_URL 时，chat_url 使用 assistant_config 的值

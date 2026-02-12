@@ -33,6 +33,8 @@ export const CTA_CONTACT_PERMISSIONS = [
   'FUNC_FUNC_CTA_ROUTE',
   'METHOD_METHOD_CTA_CONTACT',
 ];
+// Zipcode 引导/入口与使用：有则展示 zip 引导且 zip 参与内容逻辑
+export const ZIPCODE_PERMISSIONS = ['METHOD_METHOD_PLAY_CONTENT_ZIPCODE'];
 
 /**
  * 将接口返回的 permissions 数组规范化为 Set（支持单/双前缀互推）

@@ -441,7 +441,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
   };
 
   return (
-    <MobileContainer backdropImage="/bg2.png">
+    <MobileContainer backdropImage={magnetContext?.background_image_url || '/bg2.png'}>
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
@@ -573,8 +573,8 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                     <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
                   </button>
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">B</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Bruce Lee</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">{(magnetContext?.assistant_prompt_label?.[0] || 'L').toUpperCase()}</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">{magnetContext?.assistant_prompt_label || 'Concierge Leo'}</span>
                   </div>
                 </div>
                 {/* Header CTA：chat_url > skip_url > 联系；无 magnetContext.cta 或权限不通过则不展示 */}

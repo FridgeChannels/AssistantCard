@@ -33,7 +33,7 @@ function AppWithRouter() {
         const data = await getMagnetBySn(sn, { signal: controller.signal })
         if (!cancelled) {
           setMagnetId(data?.id ?? '')
-          setMagnetContext(data ? { solution: data.solution, cta: data.cta, industry_id: data.industry_id, assistant_config: data.assistant_config ?? null } : null)
+          setMagnetContext(data ? { solution: data.solution, cta: data.cta, industry_id: data.industry_id, assistant_config: data.assistant_config ?? null, assistant_prompt_label: data.assistant_prompt_label ?? null, background_image_url: data.background_image_url ?? null } : null)
           setMagnetInfo(data)
         }
       } catch (e) {

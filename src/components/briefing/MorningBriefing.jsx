@@ -22,6 +22,7 @@ import {
     CHAT_URL_PERMISSIONS,
     SKIP_URL_PERMISSIONS,
     CTA_CONTACT_PERMISSIONS,
+    ZIPCODE_PERMISSIONS,
     normalizePermissionSet,
     hasAllPermissions,
     hasAnyAssistantPermission,
@@ -319,9 +320,12 @@ export function MorningBriefing({
                 };
                 setPlayContent(content);
 
-                // zipcode 引导弹窗已隐藏，不再根据 hasZip 弹出
-                // const skipped = localStorage.getItem('zip_onboarding_skipped');
-                // if (!hasZip && !skipped) setShowOnboarding(true);
+                // Zip 引导弹窗：有 zip 权限 + 未填 zip + 未 skip 时展示
+                const permissions = magnetContext?.solution?.permissions ?? [];
+                const permSet = normalizePermissionSet(permissions);
+                const hasZipPermission = hasAllPermissions(permSet, ZIPCODE_PERMISSIONS);
+                const skipped = localStorage.getItem('zip_onboarding_skipped');
+                if (hasZipPermission && !hasZip && !skipped) setShowOnboarding(true);
 
                 if (onPlayContentLoaded) {
                     const payload = longTextDisplayIndex != null
@@ -371,6 +375,16 @@ export function MorningBriefing({
 
         loadPlayContent();
     }, []);
+
+    // 当 magnetContext 晚于 play content 到达时，仍按 zip 权限 + 未填 zip + 未 skip 决定是否展示 zip 引导
+    useEffect(() => {
+        if (!magnetContext?.solution?.permissions?.length || !playContent) return;
+        const permSet = normalizePermissionSet(magnetContext.solution.permissions);
+        const hasZipPermission = hasAllPermissions(permSet, ZIPCODE_PERMISSIONS);
+        const hasZip = !!playContent.hasZipCode;
+        const skipped = localStorage.getItem('zip_onboarding_skipped');
+        if (hasZipPermission && !hasZip && !skipped) setShowOnboarding(true);
+    }, [magnetContext, playContent]);
 
     const handlePlay = async () => {
         if (!audioElement) {
@@ -430,6 +444,8 @@ export function MorningBriefing({
     
     const showSkipUrlButton = hasConflict ? false : hasAllPermissions(permissionSet, SKIP_URL_PERMISSIONS);
     const showCtaContactButton = hasConflict ? false : hasAllPermissions(permissionSet, CTA_CONTACT_PERMISSIONS);
+    // Zip 权限：控制 zip 引导弹窗与播放器下方 zipcode 选择入口的显隐
+    const hasZipPermission = hasAllPermissions(permissionSet, ZIPCODE_PERMISSIONS);
 
     const handleOnboardingSkip = () => {
         localStorage.setItem('zip_onboarding_skipped', 'true');
@@ -486,8 +502,8 @@ export function MorningBriefing({
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">B</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">Bruce Lee</span>
+                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">{(magnetContext?.assistant_prompt_label?.[0] || 'L').toUpperCase()}</div>
+                    <span className="font-semibold text-sothebys-navy tracking-tight">{magnetContext?.assistant_prompt_label || 'Concierge Leo'}</span>
                 </div>
             </header>
 
@@ -702,8 +718,8 @@ export function MorningBriefing({
                         </motion.div>
                     )}
 
-                    {/* Location Selector / zipcode 输入与展示已隐藏 */}
-                    {false && !hideLocationSelector && !showOnboarding && (
+                    {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
+                    {hasZipPermission && !hideLocationSelector && !showOnboarding && (
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
@@ -761,7 +777,7 @@ export function MorningBriefing({
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Bruce Lee</span>
+                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
                                                     </button>
                                                 </Glass>
                                             )}
@@ -889,7 +905,7 @@ export function MorningBriefing({
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
+                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
                                                     </button>
                                                 </Glass>
                                             )}
