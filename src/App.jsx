@@ -588,7 +588,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                       {headerCta.label}
                     </button>
                   ) : (
-                    <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
+                    <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={`${btnClass} btn-press`}>
                       {headerCta.label}
                     </a>
                   );

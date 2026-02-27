@@ -21,4 +21,24 @@
   .safe-area-inset-top {
     padding-top: env(safe-area-inset-top, 0);
   }
+  
+  /* 按钮按下反馈：按下瞬间轻微缩放 */
+  button {
+    @apply transition-transform duration-150 ease-out;
+    touch-action: manipulation;
+  }
+  button:active {
+    transform: scale(0.97);
+  }
+}
+
+@layer components {
+  /* 用于充当按钮的 <a> 等元素 */
+  .btn-press:active {
+    transform: scale(0.97);
+  }
+  .btn-press {
+    @apply transition-transform duration-150 ease-out;
+    touch-action: manipulation;
+  }
 }

@@ -761,7 +761,7 @@ export function MorningBriefing({
                                                     <button
                                                         type="button"
                                                         onClick={onTalkToAssistant}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
@@ -774,7 +774,7 @@ export function MorningBriefing({
                                                     <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
@@ -788,7 +788,7 @@ export function MorningBriefing({
                                                         href={cta.chat_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
@@ -803,7 +803,7 @@ export function MorningBriefing({
                                                 <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
                                                     <Phone className="w-5 h-5 text-[#010101]" />
                                                     <span className="text-base font-medium text-[#010101]">{cta.name || 'Contact'}</span>
@@ -860,7 +860,7 @@ export function MorningBriefing({
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{cta.name || 'Link'}</span>
@@ -880,7 +880,7 @@ export function MorningBriefing({
                                                         href={ctaLink}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
@@ -889,7 +889,7 @@ export function MorningBriefing({
                                                     <button
                                                         type="button"
                                                         onClick={onTalkToAssistant}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
@@ -902,7 +902,7 @@ export function MorningBriefing({
                                                     <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
@@ -917,7 +917,7 @@ export function MorningBriefing({
                                                 <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
                                                     <Phone className="w-5 h-5 text-[#010101]" />
                                                     <span className="text-base font-medium text-[#010101]">{cta?.name || 'Contact'}</span>
@@ -974,7 +974,7 @@ export function MorningBriefing({
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{cta?.name || 'Link'}</span>
@@ -987,7 +987,7 @@ export function MorningBriefing({
                                                 href={ctaLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
@@ -999,7 +999,7 @@ export function MorningBriefing({
                                             <button
                                                 type="button"
                                                 onClick={onTalkToAssistant}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
