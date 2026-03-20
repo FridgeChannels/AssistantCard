@@ -4,9 +4,10 @@ import { MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../../lib/utils';
 import { Glass } from '../layout/Glass';
+import { AssistantLogo } from '../layout/AssistantIdentity';
 
 /**
- * @param {string} [assistantLabel] - Assistant name/label; first character used for avatar badge (default 'L')
+ * @param {string} [assistantLabel] - Assistant name/label; used for avatar alt text
  */
 export function AnswerCard({ answer, question, onQuestionSelect, showRelated, onTextJames, onNotNow, agentName = 'James', answerStartRef, assistantLabel }) {
     if (!answer) return null;
@@ -40,10 +41,11 @@ export function AnswerCard({ answer, question, onQuestionSelect, showRelated, on
                 transition={{ delay: 0.1 }}
                 className="flex items-start gap-3"
             >
-                {/* Assistant Avatar - 首字母徽章（圆形） */}
-                <div className="w-7 h-7 rounded-full bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs shadow-lg flex-none mt-1" aria-label="Agent">
-                    {(assistantLabel?.[0] || 'L').toUpperCase()}
-                </div>
+                {/* Assistant Avatar - 统一使用品牌 logo */}
+                <AssistantLogo
+                    alt={assistantLabel ? `${assistantLabel} avatar` : 'Assistant avatar'}
+                    className="rounded-full shadow-lg mt-1"
+                />
 
                 {/* Answer Content */}
                 <div className="flex-1 space-y-3 max-w-[90%]">

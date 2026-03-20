@@ -124,7 +124,7 @@ function TpPageWithRouter() {
 
   if (status === 'loading') {
     return (
-      <MobileContainer backdropImage="/bg2.png">
+      <MobileContainer backdropImage="/bg7.png">
         <div className="flex-1 flex flex-col items-center justify-center text-sothebys-navy/80">
           <div className="w-8 h-8 border-2 border-sothebys-navy/30 border-t-sothebys-navy rounded-full animate-spin" />
           <p className="mt-4 text-sm">Loading...</p>
@@ -135,7 +135,7 @@ function TpPageWithRouter() {
 
   if (status === 'error') {
     return (
-      <MobileContainer backdropImage="/bg2.png">
+      <MobileContainer backdropImage="/bg7.png">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center text-sothebys-navy/80">
           <p className="text-sm">Content not found or link has expired.</p>
         </div>

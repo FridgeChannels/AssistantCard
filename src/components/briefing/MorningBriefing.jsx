@@ -12,6 +12,7 @@ function playIndexStorageKey(snOrCId, configId) {
 }
 import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
+import { AssistantIdentity } from '../layout/AssistantIdentity';
 import { Glass } from '../layout/Glass';
 import { LocationSelector } from './LocationSelector';
 import { ZipCodeOnboarding } from './ZipCodeOnboarding';
@@ -27,6 +28,11 @@ import {
     hasAllPermissions,
     hasAnyAssistantPermission,
 } from '../../lib/ctaPermissions';
+
+const DEFAULT_ASSISTANT_CTA_LABEL = 'Explore More';
+const renderDefaultAssistantCtaIcon = () => (
+    <LinkIcon className="w-5 h-5 text-[#010101]" />
+);
 
 export function MorningBriefing({
     onTalkToAssistant,
@@ -501,10 +507,10 @@ export function MorningBriefing({
             </AnimatePresence>
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">{(magnetContext?.assistant_prompt_label?.[0] || 'L').toUpperCase()}</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">{magnetContext?.assistant_prompt_label || 'Concierge Leo'}</span>
-                </div>
+                <AssistantIdentity
+                    label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+                    imageClassName="shadow-sm"
+                />
             </header>
 
             {/* Main Content - Scrollable */}
@@ -763,12 +769,12 @@ export function MorningBriefing({
                                                         onClick={onTalkToAssistant}
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
+                                                        {renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </button>
                                                 </Glass>
                                             )}
-                                            {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!showChatWithLeo && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
@@ -882,8 +888,8 @@ export function MorningBriefing({
                                                         rel="noopener noreferrer"
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                        {ctaTextOverride ? <LinkIcon className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </a>
                                                 ) : (
                                                     <button
@@ -891,12 +897,12 @@ export function MorningBriefing({
                                                         onClick={onTalkToAssistant}
                                                         className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                        {ctaTextOverride ? <MessageCircle className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </button>
                                                 )}
                                             </Glass>
-                                            {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!ctaLink && !ctaTextOverride && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
@@ -989,8 +995,8 @@ export function MorningBriefing({
                                                 rel="noopener noreferrer"
                                                 className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                {ctaTextOverride ? <LinkIcon className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                             </a>
                                         </Glass>
                                     ) : (
@@ -1001,8 +1007,8 @@ export function MorningBriefing({
                                                 onClick={onTalkToAssistant}
                                                 className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                {ctaTextOverride ? <MessageCircle className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                             </button>
                                         </Glass>
                                     )}

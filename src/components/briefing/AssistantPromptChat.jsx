@@ -5,6 +5,7 @@ import { AnswerCard } from '../cards/AnswerCard';
 import { InputSection } from '../interaction/InputSection';
 import { StarterQuestions } from '../chat/StarterQuestions';
 import { Glass } from '../layout/Glass';
+import { AssistantIdentity } from '../layout/AssistantIdentity';
 import { getHeaderCta } from '../../lib/ctaPermissions';
 
 export function AssistantPromptChat({
@@ -56,10 +57,11 @@ export function AssistantPromptChat({
           >
             <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">{(magnetContext?.assistant_prompt_label?.[0] || 'L').toUpperCase()}</div>
-            <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">{magnetContext?.assistant_prompt_label || 'Concierge Leo'}</span>
-          </div>
+          <AssistantIdentity
+            label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+            imageClassName="shadow-lg"
+            textClassName="drop-shadow-sm"
+          />
         </div>
         {/* Header CTA：chat_url > skip_url > 联系，无数据或无权限不展示 */}
         {(() => {

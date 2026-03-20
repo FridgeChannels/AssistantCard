@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 
 /** 默认背景图：不预加载，直接展示 */
-const DEFAULT_BACKDROP = '/bg2.png';
+const DEFAULT_BACKDROP = '/bg7.png';
 const isDefaultBackdrop = (url) =>
-  !url || url === DEFAULT_BACKDROP || (typeof url === 'string' && url.endsWith('bg2.png'));
+  !url || url === DEFAULT_BACKDROP || (typeof url === 'string' && url.endsWith('bg7.png'));
 
 /**
- * 主布局容器：支持可选背景图；自定义 URL 时预加载后再展示，失败回退 /bg2.png，避免闪烁。
+ * 主布局容器：支持可选背景图；自定义 URL 时预加载后再展示，失败回退 /bg7.png，避免闪烁。
  * @param {React.ReactNode} children
  * @param {string} [className]
- * @param {string|null} [backdropImage=null] - 背景图 URL；空则无图；自定义 URL 时预加载并预加载 bg2 以备回退
+ * @param {string|null} [backdropImage=null] - 背景图 URL；空则无图；自定义 URL 时预加载并预加载 bg7 以备回退
  */
 export function MobileContainer({ children, className, backdropImage = null }) {
   // 自定义 URL 时：{ url: 当前请求的 URL, displayed: 实际要展示的 URL }，仅当 url === backdropImage 时使用 displayed
@@ -18,11 +18,11 @@ export function MobileContainer({ children, className, backdropImage = null }) {
 
   useEffect(() => {
     if (!backdropImage || isDefaultBackdrop(backdropImage)) return;
-    // 自定义 URL：先清空展示，预加载自定义图与 bg2（bg2 仅备回退，不展示）
+    // 自定义 URL：先清空展示，预加载自定义图与 bg7（bg7 仅备回退，不展示）
     setDisplayedFor({ url: backdropImage, displayed: null });
     const img = new Image();
-    const bg2 = new Image();
-    bg2.src = DEFAULT_BACKDROP;
+    const bg7 = new Image();
+    bg7.src = DEFAULT_BACKDROP;
     let cancelled = false;
     img.onload = () => {
       if (!cancelled) setDisplayedFor({ url: backdropImage, displayed: backdropImage });

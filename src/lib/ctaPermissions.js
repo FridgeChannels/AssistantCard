@@ -3,7 +3,7 @@
  * 供 MorningBriefing、App.jsx Chat header、AssistantPromptChat header 共用。
  */
 
-// Chat with Leo 按钮显示条件
+// 默认 Assistant CTA 按钮显示条件
 export const CHAT_WITH_LEO_PERMISSIONS = [
   'MOD_MOD_ASSISTANT',
   'FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE',
