@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon, Phone, Mail, MessageSquare } from 'lucide-react';
 import { getPlayContentList } from '../../lib/playContentService';
 
-/** localStorage key for Long Text 当前索引。优先用 sn（URL 稳定），否则 cId，保证首次与再次进入 key 一致 */
+/** localStorage key 用于顺序播放当前索引。configId 可为 number（long_text 的 config_id）或 'latest'（latest 多条顺序播） */
 const PLAY_INDEX_KEY_PREFIX = 'play_content_index_';
 function playIndexStorageKey(snOrCId, configId) {
     const id = snOrCId != null && snOrCId !== '' ? String(snOrCId) : null;
@@ -14,6 +14,7 @@ import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 import { AssistantIdentity } from '../layout/AssistantIdentity';
 import { Glass } from '../layout/Glass';
+import { SingleLineMarqueeTitle } from '../SingleLineMarqueeTitle';
 import { LocationSelector } from './LocationSelector';
 import { ZipCodeOnboarding } from './ZipCodeOnboarding';
 
@@ -174,17 +175,23 @@ export function MorningBriefing({
             }
         };
 
-        if (rule === 'rss' || rule === 'latest') {
+        // 单条：rss 或 latest 仅一条
+        if (rule === 'rss' || (rule === 'latest' && (!items || items.length <= 1))) {
             const item = items?.[0];
             if (item) applyItem(item, item.audio_url, null);
             return;
         }
 
-        if (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) {
-            const key = playIndexStorageKey(sn || cId, cachedPlayContent.config_id);
-            if (!key) return;
+        // 顺序列表：long_text_sequential（有 config_id）或 latest 多条（key 用 'latest'），同一套流程
+        const isSequentialList =
+            (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) ||
+            (rule === 'latest' && items?.length > 1);
+        const sequentialKey = isSequentialList
+            ? playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? cachedPlayContent.config_id : 'latest')
+            : null;
+        if (sequentialKey) {
+            const key = sequentialKey;
             const N = items.length;
-            // 应用内返回：优先用 cache 的 currentLongTextIndex，保证「回来同一条」
             const cachedIdx = cachedPlayContent.currentLongTextIndex;
             let idx = (cachedIdx != null && Number.isInteger(cachedIdx) && cachedIdx >= 0 && cachedIdx < N)
                 ? cachedIdx
@@ -289,22 +296,25 @@ export function MorningBriefing({
                 let longTextN = 0;
                 let longTextDisplayIndex = null; // 仅 longtext 时有值，供 onPlayContentLoaded 写入 cache
 
-                if (rule === 'rss' || rule === 'latest') {
+                // 单条：rss 或 latest 仅一条
+                if (rule === 'rss' || (rule === 'latest' && items.length <= 1)) {
                     currentItem = items[0] ?? null;
-                } else if (rule === 'long_text_sequential' && items.length > 0 && configId != null) {
-                    longTextKey = playIndexStorageKey(sn || cId, configId);
+                } else if (
+                    (rule === 'long_text_sequential' && items.length > 0 && configId != null) ||
+                    (rule === 'latest' && items.length > 1)
+                ) {
+                    // 顺序列表：long_text 用 config_id，latest 多条用 key 'latest'
+                    longTextKey = playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? configId : 'latest');
                     if (!longTextKey) { hasLoadedPlayContent.current = false; return; }
                     longTextN = items.length;
                     const N = items.length;
                     let idx = parseInt(localStorage.getItem(longTextKey), 10);
-                    let displayIdx; // 本次展示的索引，用于 currentLongTextIndex
+                    let displayIdx;
                     if (Number.isNaN(idx) || idx < 0 || idx >= N) {
-                        // 方案 B：首次不推进，显示第 0 条
                         displayIdx = 0;
                         localStorage.setItem(longTextKey, String(0));
                         currentItem = items[0] ?? null;
                     } else {
-                        // 非首次：每贴播下一条
                         displayIdx = (idx + 1) % N;
                         localStorage.setItem(longTextKey, String(displayIdx));
                         currentItem = items[displayIdx] ?? null;
@@ -558,10 +568,13 @@ export function MorningBriefing({
                                     {/* Date */}
                                     <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
 
-                                    {/* Title - using content from database */}
-                                    <h2 className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4">
+                                    {/* Title - single line, marquee when long */}
+                                    <SingleLineMarqueeTitle
+                                        as="h2"
+                                        className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4 w-full"
+                                    >
                                         {displayTitle}
-                                    </h2>
+                                    </SingleLineMarqueeTitle>
                                 </div>
 
                                 {/* Audio Player */}

@@ -704,8 +704,8 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
-  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先；按 magnet→magnet_config.industry_solution_id 限定行业）
-  // 通过 URL 中的 sn（如 /p/N819HqJYQ123）定位 magnet：请求使用 ?sn=xxx，后端用 sn 查 magnet 得到 zip_code、industry_solution_id
+  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先；按 magnet→magnet_config.industry_solution_id 限定，play_news_contents 按 industry_solution_id 过滤）
+  // 通过 URL 中的 sn 定位 magnet：请求 ?sn=xxx，后端用 sn 查 magnet 得到 zip_code、magnet_config_id，再查 magnet_config 得 industry_solution_id，不查 industry_solution 表
   app.get('/api/play-contents/today', async (req, res) => {
     const { sn, magnetId: magnetIdQuery } = req.query;
 
@@ -715,7 +715,6 @@ export function registerApiRoutes(app, supabase) {
       let resolvedMagnetId = null;
       let zipCode = null;
       let industrySolutionId = null;
-      let industryId = null;
       let locationFormatted = null;
 
       if (sn) {
@@ -770,13 +769,6 @@ export function registerApiRoutes(app, supabase) {
         }
       }
 
-      if (industrySolutionId != null) {
-        const { data: isRow } = await timing.time('sb_industry_solution_for_industry_id', () =>
-          supabase.from('industry_solution').select('industry_id').eq('id', industrySolutionId).maybeSingle(),
-        );
-        if (isRow?.industry_id != null) industryId = isRow.industry_id;
-      }
-
       const selectCols = 'id, headline, audio_url';
       const orderOpt = { ascending: false };
 
@@ -787,21 +779,20 @@ export function registerApiRoutes(app, supabase) {
           resolvedMagnetId,
           zipCode,
           industrySolutionId,
-          industryId,
           hasZipCode,
         });
       }
 
       if (zipCode) {
         let byZipQuery = supabase.from('play_news_contents').select(selectCols).eq('zip_code', zipCode);
-        if (industryId != null) {
-          byZipQuery = byZipQuery.eq('industry_id', industryId);
+        if (industrySolutionId != null) {
+          byZipQuery = byZipQuery.eq('industry_solution_id', industrySolutionId);
         }
         if (debug) {
           console.log(
-            '[play-contents] 查询1 条件: zip_code=%s, industry_id=%s',
+            '[play-contents] 查询1 条件: zip_code=%s, industry_solution_id=%s',
             zipCode,
-            industryId ?? '(未设置)',
+            industrySolutionId ?? '(未设置)',
           );
         }
         const { data: byZip, error: zipErr } = await timing.time('sb_play_by_zip', () =>
@@ -828,11 +819,11 @@ export function registerApiRoutes(app, supabase) {
       }
 
       let latestQuery = supabase.from('play_news_contents').select(selectCols);
-      if (industryId != null) {
-        latestQuery = latestQuery.eq('industry_id', industryId);
+      if (industrySolutionId != null) {
+        latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
       }
       if (debug) {
-        console.log('[play-contents] 查询2 条件: industry_id=%s', industryId ?? '(未设置)');
+        console.log('[play-contents] 查询2 条件: industry_solution_id=%s', industrySolutionId ?? '(未设置)');
       }
       const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
         latestQuery.order('created_at', orderOpt).limit(1),
@@ -885,7 +876,6 @@ export function registerApiRoutes(app, supabase) {
       const timing = createServerTiming();
       let magnet = null;
       let industrySolutionId = null;
-      let industryId = null;
 
       if (sn) {
         const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_sn', () =>
@@ -934,13 +924,6 @@ export function registerApiRoutes(app, supabase) {
         if (!mcErr && mc?.industry_solution_id != null) industrySolutionId = mc.industry_solution_id;
       }
 
-      if (industrySolutionId != null) {
-        const { data: isRow } = await timing.time('sb_industry_solution_for_industry_id', () =>
-          supabase.from('industry_solution').select('industry_id').eq('id', industrySolutionId).maybeSingle(),
-        );
-        if (isRow?.industry_id != null) industryId = isRow.industry_id;
-      }
-
       const { data: playConfig, error: configErr } = await timing.time('sb_play_content_config', () =>
         supabase
           .from('magnet_play_content_configs')
@@ -952,19 +935,22 @@ export function registerApiRoutes(app, supabase) {
       );
 
       if (configErr || !playConfig) {
-        const selectCols = 'id, headline, audio_url';
+        const selectCols = 'id, headline, audio_url, order_index';
         let latestQuery = supabase.from('play_news_contents').select(selectCols);
-        if (industryId != null) {
-          latestQuery = latestQuery.eq('industry_id', industryId);
+        if (industrySolutionId != null) {
+          latestQuery = latestQuery.eq('industry_solution_id', industrySolutionId);
         }
         const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
-          latestQuery.order('created_at', { ascending: false }).limit(1),
+          industrySolutionId != null
+            ? latestQuery.order('order_index', { ascending: true })
+            : latestQuery.order('created_at', { ascending: false }).limit(1),
         );
         if (latestErr) {
           console.error('Error querying play_news_contents (latest):', latestErr);
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
-        const items = (latest?.length > 0) ? [toItem(latest[0])] : [];
+        const rows = Array.isArray(latest) ? latest : (latest ? [latest] : []);
+        const items = (industrySolutionId != null ? rows : rows.slice(0, 1)).map(toItem);
         setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
         timing.setHeader(res);
         const payloadLatest = {
@@ -1039,19 +1025,22 @@ export function registerApiRoutes(app, supabase) {
         return res.json(payloadLt);
       }
 
-      const selectColsFallback = 'id, headline, audio_url';
+      const selectColsFallback = 'id, headline, audio_url, order_index';
       let fallbackQuery = supabase.from('play_news_contents').select(selectColsFallback);
-      if (industryId != null) {
-        fallbackQuery = fallbackQuery.eq('industry_id', industryId);
+      if (industrySolutionId != null) {
+        fallbackQuery = fallbackQuery.eq('industry_solution_id', industrySolutionId);
       }
       const { data: fallback, error: fallbackErr } = await timing.time('sb_play_fallback', () =>
-        fallbackQuery.order('created_at', { ascending: false }).limit(1),
+        industrySolutionId != null
+          ? fallbackQuery.order('order_index', { ascending: true })
+          : fallbackQuery.order('created_at', { ascending: false }).limit(1),
       );
       if (fallbackErr) {
         console.error('Error querying play_news_contents (fallback):', fallbackErr);
         return res.status(500).json({ error: 'Failed to query play_news_contents' });
       }
-      const items = (fallback?.length > 0) ? [toItem(fallback[0])] : [];
+      const fallbackRows = Array.isArray(fallback) ? fallback : (fallback ? [fallback] : []);
+      const items = (industrySolutionId != null ? fallbackRows : fallbackRows.slice(0, 1)).map(toItem);
       setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
       timing.setHeader(res);
       const payloadFallback = {
