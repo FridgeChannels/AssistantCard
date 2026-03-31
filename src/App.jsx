@@ -11,6 +11,7 @@ import { MusicChat } from './components/chat/MusicChat';
 import { History } from './components/history/History';
 import { AssistantPromptChat } from './components/briefing/AssistantPromptChat';
 import { AssistantIdentity } from './components/layout/AssistantIdentity';
+import { ActivationFlow } from './components/activation/ActivationFlow';
 import { sendChatMessageStream, sendAssistantPromptMessageStream } from './lib/chatService';
 import { getAgentInfo } from './lib/agentService';
 import { updateMagnetZip } from './lib/locationService';
@@ -50,6 +51,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [conversationId, setConversationId] = useState(''); // 用于保持对话上下文
   const [currentAnswer, setCurrentAnswer] = useState(''); // 用于流式更新当前答案
+  const [showActivation, setShowActivation] = useState(false); // 控制激活页面显示
   const [retryQuestion, setRetryQuestion] = useState(''); // 用于存储需要重试的问题
   const [agentInfo, setAgentInfo] = useState({ phone: '', email: '', name: 'James' }); // 代理联系信息
   const [starterQuestions, setStarterQuestions] = useState([]); // 存储预加载的推荐问题
@@ -176,6 +178,11 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     return () => {
       stopStreamTimer();
     };
+  }, []);
+
+  // 暴露给全局以便测试（测试后可移除）
+  useEffect(() => {
+    window.triggerActivation = () => setShowActivation(true);
   }, []);
 
   const handleRoleSelect = (role) => {
@@ -696,6 +703,12 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {showActivation && (
+          <ActivationFlow onClose={() => setShowActivation(false)} />
+        )}
+      </AnimatePresence>
 
       <TextMeSheet
         isOpen={isSheetOpen}

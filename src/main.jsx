@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import TpPage from './pages/TpPage.jsx'
+import ActivationPage from './pages/ActivationPage.jsx'
 import { getMagnetBySn } from './lib/magnetIdService.js'
 import { apiGetContentPlayById } from './api/backendClient.js'
 import { MobileContainer } from './components/layout/MobileContainer.jsx'
@@ -153,6 +154,8 @@ createRoot(document.getElementById('root')).render(
       <Route path="/p/:sn?" element={<AppWithRouter />} />
       {/* URL 使用 content_play 表主键 id，例如 /tp/123 */}
       <Route path="/tp/:id" element={<TpPageWithRouter />} />
+      {/* 激活码页面 */}
+      <Route path="/activate" element={<ActivationPage />} />
     </Routes>
   </BrowserRouter>,
 )
