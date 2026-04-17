@@ -517,10 +517,12 @@ export function MorningBriefing({
             </AnimatePresence>
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
-                <AssistantIdentity
-                    label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
-                    imageClassName="shadow-sm"
-                />
+                {sn !== '1' && (
+                  <AssistantIdentity
+                      label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+                      imageClassName="shadow-sm"
+                  />
+                )}
             </header>
 
             {/* Main Content - Scrollable */}

@@ -19,6 +19,7 @@ import { logUserAction, logChatMessage } from './lib/loggingService';
 import { pageTimeTracker } from './lib/pageTimeTracker';
 import { getHeaderCta } from './lib/ctaPermissions';
 import { Info, ArrowLeft } from 'lucide-react';
+import segwayLogo from './assets/Segway_logo_image.png';
 
 /**
  * Parse answer text to extract answer_method from [method] prefix
@@ -448,8 +449,10 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     }
   };
 
+  const currentBackdrop = sn === '1' ? segwayLogo : (magnetContext?.background_image_url || "/bg7.png");
+
   return (
-    <MobileContainer backdropImage="/bg7.png">
+    <MobileContainer backdropImage={currentBackdrop}>
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
@@ -580,11 +583,13 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                   >
                     <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
                   </button>
-                  <AssistantIdentity
-                    label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
-                    imageClassName="shadow-lg"
-                    textClassName="drop-shadow-sm"
-                  />
+                  {sn !== '1' && (
+                    <AssistantIdentity
+                      label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+                      imageClassName="shadow-lg"
+                      textClassName="drop-shadow-sm"
+                    />
+                  )}
                 </div>
                 {/* Header CTA：chat_url > skip_url > 联系；无 magnetContext.cta 或权限不通过则不展示 */}
                 {(() => {
