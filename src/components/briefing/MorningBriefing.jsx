@@ -401,9 +401,6 @@ export function MorningBriefing({
         }
     };
 
-    // Display title: use title field
-    const displayTitle = playContent?.title || 'Daily Briefing';
-
     // 底部 CTA：有 magnetContext.cta 时展示多按钮；仅 ctaTextOverride/ctaLink 时（如 TpPage）展示单按钮
     const cta = magnetContext?.cta;
     const hasFullCta = cta && (cta.name != null || cta.phone || cta.email || cta.chat_url || cta.skip_url);
@@ -476,14 +473,14 @@ export function MorningBriefing({
                 )}
             </AnimatePresence>
             {/* Header */}
-            <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
+            {/* <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
                 {!isMinimalChromeSn(sn) && (
                   <AssistantIdentity
                       label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
                       imageClassName="shadow-sm"
                   />
                 )}
-            </header>
+            </header> */}
 
             {/* Main Content - Scrollable */}
             <div className="flex-1 overflow-y-auto no-scrollbar">
@@ -525,18 +522,18 @@ export function MorningBriefing({
                             transition={{ duration: 0.5 }}
                             className="w-full max-w-md mb-3"
                         >
-                            <Glass variant="panel" className="p-8 flex flex-col justify-between">
+                            <div className="p-8 flex flex-col justify-between w-full">
                                 <div className="flex flex-col items-center">
-                                    {/* Date */}
-                                    <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
-
-                                    {/* Title - single line, marquee when long */}
+                                    {/* Title - single line, marquee when long；文案用 assistant_prompt_label */}
                                     <SingleLineMarqueeTitle
                                         as="h2"
-                                        className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4 w-full"
+                                        className="text-2xl font-bold text-white text-center mb-3 leading-tight px-4 w-full"
                                     >
-                                        {displayTitle}
+                                        {magnetContext?.assistant_prompt_label || 'Daily Briefing'}
                                     </SingleLineMarqueeTitle>
+
+                                    {/* Date（置于标题下方） */}
+                                    <p className="text-base text-white/80 text-center mb-8">{dateString}</p>
                                 </div>
 
                                 {/* Audio Player */}
@@ -547,8 +544,8 @@ export function MorningBriefing({
                                             <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
                                                 <defs>
                                                     <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="#010101" stopOpacity="0.8" />
-                                                        <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
+                                                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
+                                                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0.2" />
                                                     </linearGradient>
                                                 </defs>
                                                 {/* Upper Wave */}
@@ -556,9 +553,9 @@ export function MorningBriefing({
                                                     <motion.path
                                                         d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.9 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
                                                         animate={{
                                                             d: [
                                                                 "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
@@ -576,9 +573,9 @@ export function MorningBriefing({
                                                     <path
                                                         d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.9 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
                                                     />
                                                 )}
                                                 {/* Lower Wave (Mirrored) */}
@@ -586,9 +583,9 @@ export function MorningBriefing({
                                                     <motion.path
                                                         d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.4 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
                                                         animate={{
                                                             d: [
                                                                 "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
@@ -606,9 +603,9 @@ export function MorningBriefing({
                                                     <path
                                                         d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.4 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
                                                     />
                                                 )}
                                             </svg>
@@ -618,12 +615,12 @@ export function MorningBriefing({
                                         <button
                                             onClick={handlePlay}
                                             disabled={!audioElement}
-                                            className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                                            className="w-16 h-16 bg-white/15 rounded-full flex items-center justify-center hover:bg-white/25 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
                                         >
                                             {isPlaying ? (
-                                                <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
+                                                <Pause className="w-7 h-7 text-white" fill="currentColor" />
                                             ) : (
-                                                <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
+                                                <Play className="w-7 h-7 text-white ml-0.5" fill="currentColor" />
                                             )}
                                         </button>
 
@@ -635,9 +632,9 @@ export function MorningBriefing({
                                                     <motion.path
                                                         d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.9 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
                                                         animate={{
                                                             d: [
                                                                 "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
@@ -655,9 +652,9 @@ export function MorningBriefing({
                                                     <path
                                                         d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.9 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
                                                     />
                                                 )}
                                                 {/* Lower Wave (Mirrored) */}
@@ -665,9 +662,9 @@ export function MorningBriefing({
                                                     <motion.path
                                                         d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.4 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
                                                         animate={{
                                                             d: [
                                                                 "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
@@ -685,9 +682,9 @@ export function MorningBriefing({
                                                     <path
                                                         d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
                                                         fill="none"
-                                                        stroke="#010101"
+                                                        stroke="#ffffff"
                                                         strokeWidth="0"
-                                                        style={{ fill: '#010101', opacity: 0.4 }}
+                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
                                                     />
                                                 )}
                                             </svg>
@@ -695,7 +692,7 @@ export function MorningBriefing({
                                     </div>
                                 )}
                                 {/* End Audio Player */}
-                            </Glass>
+                            </div>
                         </motion.div>
                     )}
 
