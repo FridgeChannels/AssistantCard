@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { SingleLineMarqueeTitle } from '../SingleLineMarqueeTitle';
 
 export function CuratedPlayer({ stage }) {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -51,10 +52,12 @@ export function CuratedPlayer({ stage }) {
                 {/* Overlay Controls */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-4 transition-opacity duration-300">
 
-                    <div className="flex items-center justify-between text-white">
-                        <div className="flex flex-col">
+                    <div className="flex items-center justify-between gap-3 text-white">
+                        <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-xs font-medium opacity-80 uppercase tracking-widest mb-1">Today's Insight</span>
-                            <h3 className="text-lg font-semibold leading-tight">{content.title}</h3>
+                            <SingleLineMarqueeTitle as="h3" className="text-lg font-semibold leading-tight">
+                                {content.title}
+                            </SingleLineMarqueeTitle>
                         </div>
 
                         <button

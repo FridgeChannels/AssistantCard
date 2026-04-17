@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon, Phone, Mail, MessageSquare } from 'lucide-react';
 import { getPlayContentList } from '../../lib/playContentService';
 
-/** localStorage key for Long Text 当前索引。优先用 sn（URL 稳定），否则 cId，保证首次与再次进入 key 一致 */
+/** localStorage key 用于顺序播放当前索引。configId 可为 number（long_text 的 config_id）或 'latest'（latest 多条顺序播） */
 const PLAY_INDEX_KEY_PREFIX = 'play_content_index_';
 function playIndexStorageKey(snOrCId, configId) {
     const id = snOrCId != null && snOrCId !== '' ? String(snOrCId) : null;
@@ -12,7 +12,9 @@ function playIndexStorageKey(snOrCId, configId) {
 }
 import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
+import { AssistantIdentity } from '../layout/AssistantIdentity';
 import { Glass } from '../layout/Glass';
+import { SingleLineMarqueeTitle } from '../SingleLineMarqueeTitle';
 import { LocationSelector } from './LocationSelector';
 import { ZipCodeOnboarding } from './ZipCodeOnboarding';
 
@@ -22,10 +24,17 @@ import {
     CHAT_URL_PERMISSIONS,
     SKIP_URL_PERMISSIONS,
     CTA_CONTACT_PERMISSIONS,
+    ZIPCODE_PERMISSIONS,
     normalizePermissionSet,
     hasAllPermissions,
     hasAnyAssistantPermission,
 } from '../../lib/ctaPermissions';
+import { isMinimalChromeSn } from '../../config/env';
+
+const DEFAULT_ASSISTANT_CTA_LABEL = 'Explore More';
+const renderDefaultAssistantCtaIcon = () => (
+    <LinkIcon className="w-5 h-5 text-[#010101]" />
+);
 
 export function MorningBriefing({
     onTalkToAssistant,
@@ -167,17 +176,23 @@ export function MorningBriefing({
             }
         };
 
-        if (rule === 'rss' || rule === 'latest') {
+        // 单条：rss 或 latest 仅一条
+        if (rule === 'rss' || (rule === 'latest' && (!items || items.length <= 1))) {
             const item = items?.[0];
             if (item) applyItem(item, item.audio_url, null);
             return;
         }
 
-        if (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) {
-            const key = playIndexStorageKey(sn || cId, cachedPlayContent.config_id);
-            if (!key) return;
+        // 顺序列表：long_text_sequential（有 config_id）或 latest 多条（key 用 'latest'），同一套流程
+        const isSequentialList =
+            (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) ||
+            (rule === 'latest' && items?.length > 1);
+        const sequentialKey = isSequentialList
+            ? playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? cachedPlayContent.config_id : 'latest')
+            : null;
+        if (sequentialKey) {
+            const key = sequentialKey;
             const N = items.length;
-            // 应用内返回：优先用 cache 的 currentLongTextIndex，保证「回来同一条」
             const cachedIdx = cachedPlayContent.currentLongTextIndex;
             let idx = (cachedIdx != null && Number.isInteger(cachedIdx) && cachedIdx >= 0 && cachedIdx < N)
                 ? cachedIdx
@@ -282,22 +297,25 @@ export function MorningBriefing({
                 let longTextN = 0;
                 let longTextDisplayIndex = null; // 仅 longtext 时有值，供 onPlayContentLoaded 写入 cache
 
-                if (rule === 'rss' || rule === 'latest') {
+                // 单条：rss 或 latest 仅一条
+                if (rule === 'rss' || (rule === 'latest' && items.length <= 1)) {
                     currentItem = items[0] ?? null;
-                } else if (rule === 'long_text_sequential' && items.length > 0 && configId != null) {
-                    longTextKey = playIndexStorageKey(sn || cId, configId);
+                } else if (
+                    (rule === 'long_text_sequential' && items.length > 0 && configId != null) ||
+                    (rule === 'latest' && items.length > 1)
+                ) {
+                    // 顺序列表：long_text 用 config_id，latest 多条用 key 'latest'
+                    longTextKey = playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? configId : 'latest');
                     if (!longTextKey) { hasLoadedPlayContent.current = false; return; }
                     longTextN = items.length;
                     const N = items.length;
                     let idx = parseInt(localStorage.getItem(longTextKey), 10);
-                    let displayIdx; // 本次展示的索引，用于 currentLongTextIndex
+                    let displayIdx;
                     if (Number.isNaN(idx) || idx < 0 || idx >= N) {
-                        // 方案 B：首次不推进，显示第 0 条
                         displayIdx = 0;
                         localStorage.setItem(longTextKey, String(0));
                         currentItem = items[0] ?? null;
                     } else {
-                        // 非首次：每贴播下一条
                         displayIdx = (idx + 1) % N;
                         localStorage.setItem(longTextKey, String(displayIdx));
                         currentItem = items[displayIdx] ?? null;
@@ -319,8 +337,12 @@ export function MorningBriefing({
                 };
                 setPlayContent(content);
 
+                // Zip 引导弹窗：有 zip 权限 + 未填 zip + 未 skip 时展示
+                const permissions = magnetContext?.solution?.permissions ?? [];
+                const permSet = normalizePermissionSet(permissions);
+                const hasZipPermission = hasAllPermissions(permSet, ZIPCODE_PERMISSIONS);
                 const skipped = localStorage.getItem('zip_onboarding_skipped');
-                if (!hasZip && !skipped) setShowOnboarding(true);
+                if (hasZipPermission && !hasZip && !skipped) setShowOnboarding(true);
 
                 if (onPlayContentLoaded) {
                     const payload = longTextDisplayIndex != null
@@ -370,6 +392,16 @@ export function MorningBriefing({
 
         loadPlayContent();
     }, []);
+
+    // 当 magnetContext 晚于 play content 到达时，仍按 zip 权限 + 未填 zip + 未 skip 决定是否展示 zip 引导
+    useEffect(() => {
+        if (!magnetContext?.solution?.permissions?.length || !playContent) return;
+        const permSet = normalizePermissionSet(magnetContext.solution.permissions);
+        const hasZipPermission = hasAllPermissions(permSet, ZIPCODE_PERMISSIONS);
+        const hasZip = !!playContent.hasZipCode;
+        const skipped = localStorage.getItem('zip_onboarding_skipped');
+        if (hasZipPermission && !hasZip && !skipped) setShowOnboarding(true);
+    }, [magnetContext, playContent]);
 
     const handlePlay = async () => {
         if (!audioElement) {
@@ -429,6 +461,8 @@ export function MorningBriefing({
     
     const showSkipUrlButton = hasConflict ? false : hasAllPermissions(permissionSet, SKIP_URL_PERMISSIONS);
     const showCtaContactButton = hasConflict ? false : hasAllPermissions(permissionSet, CTA_CONTACT_PERMISSIONS);
+    // Zip 权限：控制 zip 引导弹窗与播放器下方 zipcode 选择入口的显隐
+    const hasZipPermission = hasAllPermissions(permissionSet, ZIPCODE_PERMISSIONS);
 
     const handleOnboardingSkip = () => {
         localStorage.setItem('zip_onboarding_skipped', 'true');
@@ -484,10 +518,12 @@ export function MorningBriefing({
             </AnimatePresence>
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-sm">L</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight">Concierge Leo</span>
-                </div>
+                {!isMinimalChromeSn(sn) && (
+                  <AssistantIdentity
+                      label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+                      imageClassName="shadow-sm"
+                  />
+                )}
             </header>
 
             {/* Main Content - Scrollable */}
@@ -535,10 +571,13 @@ export function MorningBriefing({
                                     {/* Date */}
                                     <p className="text-base text-[#010101]/80 text-center mb-4">{dateString}</p>
 
-                                    {/* Title - using content from database */}
-                                    <h2 className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4">
+                                    {/* Title - single line, marquee when long */}
+                                    <SingleLineMarqueeTitle
+                                        as="h2"
+                                        className="text-2xl font-bold text-[#010101] text-center mb-8 leading-tight px-4 w-full"
+                                    >
                                         {displayTitle}
-                                    </h2>
+                                    </SingleLineMarqueeTitle>
                                 </div>
 
                                 {/* Audio Player */}
@@ -701,8 +740,8 @@ export function MorningBriefing({
                         </motion.div>
                     )}
 
-                    {/* Location Selector or Formatted Text */}
-                    {!hideLocationSelector && !showOnboarding && (
+                    {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
+                    {hasZipPermission && !hideLocationSelector && !showOnboarding && (
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
@@ -744,23 +783,23 @@ export function MorningBriefing({
                                                     <button
                                                         type="button"
                                                         onClick={onTalkToAssistant}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Chat with Leo</span>
+                                                        {renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </button>
                                                 </Glass>
                                             )}
-                                            {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!showChatWithLeo && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
+                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
                                                     </button>
                                                 </Glass>
                                             )}
@@ -771,7 +810,7 @@ export function MorningBriefing({
                                                         href={cta.chat_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
                                                         <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
@@ -786,7 +825,7 @@ export function MorningBriefing({
                                                 <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
                                                     <Phone className="w-5 h-5 text-[#010101]" />
                                                     <span className="text-base font-medium text-[#010101]">{cta.name || 'Contact'}</span>
@@ -843,7 +882,7 @@ export function MorningBriefing({
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{cta.name || 'Link'}</span>
@@ -863,32 +902,32 @@ export function MorningBriefing({
                                                         href={ctaLink}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                        {ctaTextOverride ? <LinkIcon className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </a>
                                                 ) : (
                                                     <button
                                                         type="button"
                                                         onClick={onTalkToAssistant}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                        {ctaTextOverride ? <MessageCircle className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                        <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                                     </button>
                                                 )}
                                             </Glass>
-                                            {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当 Chat with Leo 按钮已显示时不显示 */}
+                                            {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!ctaLink && !ctaTextOverride && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
                                                 <Glass variant="card" className="px-6 py-4">
                                                     <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                        className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
                                                         <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                        <span className="text-base font-medium text-[#010101]">Assistant</span>
+                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
                                                     </button>
                                                 </Glass>
                                             )}
@@ -900,7 +939,7 @@ export function MorningBriefing({
                                                 <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                    className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
                                                     <Phone className="w-5 h-5 text-[#010101]" />
                                                     <span className="text-base font-medium text-[#010101]">{cta?.name || 'Contact'}</span>
@@ -957,7 +996,7 @@ export function MorningBriefing({
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
                                                 <LinkIcon className="w-5 h-5 text-[#010101]" />
                                                 <span className="text-base font-medium text-[#010101]">{cta?.name || 'Link'}</span>
@@ -970,10 +1009,10 @@ export function MorningBriefing({
                                                 href={ctaLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <LinkIcon className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                {ctaTextOverride ? <LinkIcon className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                             </a>
                                         </Glass>
                                     ) : (
@@ -982,10 +1021,10 @@ export function MorningBriefing({
                                             <button
                                                 type="button"
                                                 onClick={onTalkToAssistant}
-                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                                                className="w-full flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <MessageCircle className="w-5 h-5 text-[#010101]" />
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || 'Chat with Leo'}</span>
+                                                {ctaTextOverride ? <MessageCircle className="w-5 h-5 text-[#010101]" /> : renderDefaultAssistantCtaIcon()}
+                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
                                             </button>
                                         </Glass>
                                     )}

@@ -5,6 +5,7 @@ import { AnswerCard } from '../cards/AnswerCard';
 import { InputSection } from '../interaction/InputSection';
 import { StarterQuestions } from '../chat/StarterQuestions';
 import { Glass } from '../layout/Glass';
+import { AssistantIdentity } from '../layout/AssistantIdentity';
 import { getHeaderCta } from '../../lib/ctaPermissions';
 
 export function AssistantPromptChat({
@@ -56,10 +57,11 @@ export function AssistantPromptChat({
           >
             <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">L</div>
-            <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Assistant</span>
-          </div>
+          <AssistantIdentity
+            label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
+            imageClassName="shadow-lg"
+            textClassName="drop-shadow-sm"
+          />
         </div>
         {/* Header CTA：chat_url > skip_url > 联系，无数据或无权限不展示 */}
         {(() => {
@@ -72,7 +74,7 @@ export function AssistantPromptChat({
               {headerCta.label}
             </button>
           ) : (
-            <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={btnClass}>
+            <a href={headerCta.href} target="_blank" rel="noopener noreferrer" className={`${btnClass} btn-press`}>
               {headerCta.label}
             </a>
           );
@@ -127,6 +129,7 @@ export function AssistantPromptChat({
               }}
               agentName={agentInfo.name}
               answerStartRef={isLastMessage ? answerStartRef : null}
+              assistantLabel={magnetContext?.assistant_prompt_label}
               onNotNow={() => {
                 // Hide the button by updating the answer
                 setChatHistory(prev => {

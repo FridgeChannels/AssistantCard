@@ -54,6 +54,35 @@ function createServerTiming() {
   };
 }
 
+/** 通过 magnet_config_id 读取 rel_magnetconfig_contentcategory，类目 code 去重（并集）。 */
+async function fetchPlayContentCategoryCodes(supabase, magnetConfigId, timing, timingLabel = 'sb_rel_magnet_category') {
+  if (magnetConfigId == null) return [];
+  const { data, error } = await timing.time(timingLabel, () =>
+    supabase
+      .from('rel_magnetconfig_contentcategory')
+      .select('play_content_category_code')
+      .eq('magnet_config_id', magnetConfigId),
+  );
+  if (error) {
+    console.error('Error querying rel_magnetconfig_contentcategory:', error);
+    return [];
+  }
+  const out = new Set();
+  for (const row of data ?? []) {
+    const c = row?.play_content_category_code;
+    if (c != null && String(c).trim() !== '') out.add(String(c).trim());
+  }
+  return [...out];
+}
+
+/** 保底：config_id、magnet_config_id、content_category_code 均为空（NULL 或空串）；不按 zip 过滤。 */
+function applyPlayNewsContentsFallbackFilters(q) {
+  return q
+    .is('config_id', null)
+    .is('magnet_config_id', null)
+    .or('content_category_code.is.null,content_category_code.eq.');
+}
+
 function getClientIp(req) {
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string' && xff.length > 0) {
@@ -451,7 +480,7 @@ export function registerApiRoutes(app, supabase) {
         ? timing.time('sb_magnet_config', () =>
             supabase
               .from('magnet_config')
-              .select('industry_solution_id, assistant_config, assistant_function_code')
+              .select('industry_solution_id, assistant_config, assistant_function_code, assistant_prompt_label, background_image_url')
               .eq('id', magnetRow.magnet_config_id)
               .maybeSingle(),
           )
@@ -482,10 +511,12 @@ export function registerApiRoutes(app, supabase) {
         console.error('Error querying magnet_config:', configError);
       }
 
-      // 添加 assistant_config 和 assistant_function_code 到响应中 (即使为空也要返回)
+      // 添加 assistant_config、assistant_function_code、assistant_prompt_label、background_image_url 到响应中 (即使为空也要返回)
       if (configRow) {
         payload.assistant_config = configRow.assistant_config || null;
         payload.assistant_function_code = configRow.assistant_function_code || null;
+        payload.assistant_prompt_label = configRow.assistant_prompt_label ?? null;
+        payload.background_image_url = configRow.background_image_url ?? null;
       }
 
       // 当 assistant_function_code 为 FUNC_ASSISTANT_CHAT_URL 时，chat_url 使用 assistant_config 的值
@@ -702,8 +733,7 @@ export function registerApiRoutes(app, supabase) {
     }
   });
 
-  // 获取今日播放内容（audio_url 来自 play_news_contents，按 magnet.zip_code 优先；按 magnet→magnet_config.industry_solution_id 限定行业）
-  // 通过 URL 中的 sn（如 /p/N819HqJYQ123）定位 magnet：请求使用 ?sn=xxx，后端用 sn 查 magnet 得到 zip_code、industry_solution_id
+  // 获取今日播放内容：magnet → magnet_config_id → rel_magnetconfig_contentcategory（类目并集）→ play_news_contents.content_category_code；无类目或主查无结果时用保底行（三字段空，不按 zip）
   app.get('/api/play-contents/today', async (req, res) => {
     const { sn, magnetId: magnetIdQuery } = req.query;
 
@@ -712,7 +742,7 @@ export function registerApiRoutes(app, supabase) {
       const debug = process.env.PLAY_CONTENT_DEBUG === '1';
       let resolvedMagnetId = null;
       let zipCode = null;
-      let industrySolutionId = null;
+      let magnetConfigId = null;
       let locationFormatted = null;
 
       if (sn) {
@@ -727,18 +757,7 @@ export function registerApiRoutes(app, supabase) {
           resolvedMagnetId = magnet.id;
           if (magnet.zip_code) zipCode = magnet.zip_code;
           if (magnet.formatted) locationFormatted = magnet.formatted;
-          if (magnet.magnet_config_id) {
-            const { data: config, error: configErr } = await timing.time('sb_magnet_config', () =>
-              supabase
-                .from('magnet_config')
-                .select('industry_solution_id')
-                .eq('id', magnet.magnet_config_id)
-                .maybeSingle(),
-            );
-            if (!configErr && config?.industry_solution_id != null) {
-              industrySolutionId = config.industry_solution_id;
-            }
-          }
+          if (magnet.magnet_config_id != null) magnetConfigId = magnet.magnet_config_id;
         }
       } else if (magnetIdQuery) {
         resolvedMagnetId = magnetIdQuery;
@@ -752,20 +771,11 @@ export function registerApiRoutes(app, supabase) {
         if (!magnetErr && magnet) {
           if (magnet.zip_code) zipCode = magnet.zip_code;
           if (magnet.formatted) locationFormatted = magnet.formatted;
-          if (magnet.magnet_config_id) {
-            const { data: config, error: configErr } = await timing.time('sb_magnet_config', () =>
-              supabase
-                .from('magnet_config')
-                .select('industry_solution_id')
-                .eq('id', magnet.magnet_config_id)
-                .maybeSingle(),
-            );
-            if (!configErr && config?.industry_solution_id != null) {
-              industrySolutionId = config.industry_solution_id;
-            }
-          }
+          if (magnet.magnet_config_id != null) magnetConfigId = magnet.magnet_config_id;
         }
       }
+
+      const categoryCodes = await fetchPlayContentCategoryCodes(supabase, magnetConfigId, timing);
 
       const selectCols = 'id, headline, audio_url';
       const orderOpt = { ascending: false };
@@ -776,15 +786,23 @@ export function registerApiRoutes(app, supabase) {
           sn: sn ?? null,
           resolvedMagnetId,
           zipCode,
-          industrySolutionId,
+          magnetConfigId,
+          categoryCodes,
           hasZipCode,
         });
       }
 
       if (zipCode) {
         let byZipQuery = supabase.from('play_news_contents').select(selectCols).eq('zip_code', zipCode);
+        if (categoryCodes.length > 0) {
+          byZipQuery = byZipQuery.in('content_category_code', categoryCodes);
+        }
         if (debug) {
-          console.log('[play-contents] 查询1 条件: zip_code=%s', zipCode);
+          console.log(
+            '[play-contents] 查询1 条件: zip_code=%s, content_category_code=%s',
+            zipCode,
+            categoryCodes.length > 0 ? categoryCodes : '(不限类目)',
+          );
         }
         const { data: byZip, error: zipErr } = await timing.time('sb_play_by_zip', () =>
           byZipQuery.order('created_at', orderOpt).limit(1),
@@ -810,8 +828,14 @@ export function registerApiRoutes(app, supabase) {
       }
 
       let latestQuery = supabase.from('play_news_contents').select(selectCols);
+      if (categoryCodes.length > 0) {
+        latestQuery = latestQuery.in('content_category_code', categoryCodes);
+      }
       if (debug) {
-        console.log('[play-contents] 查询2: play_news_contents 最新一条（不按 industry 过滤；表可能无 industry_id）');
+        console.log(
+          '[play-contents] 查询2 条件: content_category_code=%s',
+          categoryCodes.length > 0 ? categoryCodes : '(不限类目)',
+        );
       }
       const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
         latestQuery.order('created_at', orderOpt).limit(1),
@@ -835,6 +859,28 @@ export function registerApiRoutes(app, supabase) {
         return res.json({
           content: { id: latest[0].id, title: latest[0].headline, audio_url: latest[0].audio_url },
           from: zipCode ? 'latest_fallback' : 'latest',
+          hasZipCode,
+          locationFormatted,
+        });
+      }
+
+      let fbQuery = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectCols));
+      if (debug) {
+        console.log('[play-contents] 查询保底: fallback rows (no zip filter)');
+      }
+      const { data: fallback, error: fbErr } = await timing.time('sb_play_fallback', () =>
+        fbQuery.order('created_at', orderOpt).limit(1),
+      );
+      if (fbErr) {
+        console.error('Error querying play_news_contents (fallback):', fbErr);
+        return res.status(500).json({ error: 'Failed to query play_news_contents' });
+      }
+      if (fallback?.length > 0) {
+        setCacheSeconds(res, 300, 600);
+        timing.setHeader(res);
+        return res.json({
+          content: { id: fallback[0].id, title: fallback[0].headline, audio_url: fallback[0].audio_url },
+          from: 'fallback',
           hasZipCode,
           locationFormatted,
         });
@@ -900,6 +946,8 @@ export function registerApiRoutes(app, supabase) {
         return res.json(payload);
       }
 
+      const categoryCodes = await fetchPlayContentCategoryCodes(supabase, magnet.magnet_config_id, timing);
+
       const { data: playConfig, error: configErr } = await timing.time('sb_play_content_config', () =>
         supabase
           .from('magnet_play_content_configs')
@@ -911,16 +959,31 @@ export function registerApiRoutes(app, supabase) {
       );
 
       if (configErr || !playConfig) {
-        const selectCols = 'id, headline, audio_url';
-        const latestQuery = supabase.from('play_news_contents').select(selectCols);
+        const selectCols = 'id, headline, audio_url, order_index';
+        let latestQuery =
+          categoryCodes.length > 0
+            ? supabase.from('play_news_contents').select(selectCols).in('content_category_code', categoryCodes)
+            : applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectCols));
         const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
-          latestQuery.order('created_at', { ascending: false }).limit(1),
+          latestQuery.order('order_index', { ascending: true }),
         );
         if (latestErr) {
           console.error('Error querying play_news_contents (latest):', latestErr);
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
-        const items = (latest?.length > 0) ? [toItem(latest[0])] : [];
+        let rows = Array.isArray(latest) ? latest : (latest ? [latest] : []);
+        if (categoryCodes.length > 0 && rows.length === 0) {
+          const fbQ = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectCols));
+          const { data: fbRows, error: fbErr } = await timing.time('sb_play_latest_fb', () =>
+            fbQ.order('order_index', { ascending: true }),
+          );
+          if (fbErr) {
+            console.error('Error querying play_news_contents (latest fallback):', fbErr);
+            return res.status(500).json({ error: 'Failed to query play_news_contents' });
+          }
+          rows = Array.isArray(fbRows) ? fbRows : (fbRows ? [fbRows] : []);
+        }
+        const items = rows.map(toItem);
         setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
         timing.setHeader(res);
         const payloadLatest = {
@@ -929,7 +992,13 @@ export function registerApiRoutes(app, supabase) {
           hasZipCode,
           locationFormatted,
         };
-        if (includeDebug) payloadLatest._debug = { reason: 'no_config_or_error', magnet_config_id: magnet.magnet_config_id };
+        if (includeDebug) {
+          payloadLatest._debug = {
+            reason: 'no_config_or_error',
+            magnet_config_id: magnet.magnet_config_id,
+            category_codes: categoryCodes,
+          };
+        }
         return res.json(payloadLatest);
       }
 
@@ -995,16 +1064,31 @@ export function registerApiRoutes(app, supabase) {
         return res.json(payloadLt);
       }
 
-      const selectColsFallback = 'id, headline, audio_url';
-      const fallbackQuery = supabase.from('play_news_contents').select(selectColsFallback);
+      const selectColsFallback = 'id, headline, audio_url, order_index';
+      let fallbackQuery =
+        categoryCodes.length > 0
+          ? supabase.from('play_news_contents').select(selectColsFallback).in('content_category_code', categoryCodes)
+          : applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectColsFallback));
       const { data: fallback, error: fallbackErr } = await timing.time('sb_play_fallback', () =>
-        fallbackQuery.order('created_at', { ascending: false }).limit(1),
+        fallbackQuery.order('order_index', { ascending: true }),
       );
       if (fallbackErr) {
         console.error('Error querying play_news_contents (fallback):', fallbackErr);
         return res.status(500).json({ error: 'Failed to query play_news_contents' });
       }
-      const items = (fallback?.length > 0) ? [toItem(fallback[0])] : [];
+      let fallbackRows = Array.isArray(fallback) ? fallback : (fallback ? [fallback] : []);
+      if (categoryCodes.length > 0 && fallbackRows.length === 0) {
+        const fbQ = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectColsFallback));
+        const { data: fbData, error: fbErr } = await timing.time('sb_play_fallback_fb', () =>
+          fbQ.order('order_index', { ascending: true }),
+        );
+        if (fbErr) {
+          console.error('Error querying play_news_contents (fallback fb):', fbErr);
+          return res.status(500).json({ error: 'Failed to query play_news_contents' });
+        }
+        fallbackRows = Array.isArray(fbData) ? fbData : (fbData ? [fbData] : []);
+      }
+      const items = fallbackRows.map(toItem);
       setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
       timing.setHeader(res);
       const payloadFallback = {
@@ -1013,7 +1097,16 @@ export function registerApiRoutes(app, supabase) {
         hasZipCode,
         locationFormatted,
       };
-      if (includeDebug) payloadFallback._debug = { reason: 'config_not_rss_or_longtext', magnet_config_id: magnet.magnet_config_id, config_id: configId, source_type: playConfig.source_type, processing_type: playConfig.processing_type };
+      if (includeDebug) {
+        payloadFallback._debug = {
+          reason: 'config_not_rss_or_longtext',
+          magnet_config_id: magnet.magnet_config_id,
+          config_id: configId,
+          source_type: playConfig.source_type,
+          processing_type: playConfig.processing_type,
+          category_codes: categoryCodes,
+        };
+      }
       return res.json(payloadFallback);
     } catch (err) {
       console.error('Unexpected error in /api/play-content/list', err);

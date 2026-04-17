@@ -10,6 +10,7 @@ import { AnswerCard } from '../components/cards/AnswerCard';
 import { TextMeSheet } from '../components/escalation/TextMeSheet';
 import { StarterQuestions } from '../components/chat/StarterQuestions';
 import { MorningBriefing } from '../components/briefing/MorningBriefing';
+import { AssistantIdentity } from '../components/layout/AssistantIdentity';
 import { sendChatMessageStream } from '../lib/chatService';
 import { getAgentInfo } from '../lib/agentService';
 import { logUserAction, logChatMessage } from '../lib/loggingService';
@@ -306,7 +307,7 @@ function TpPage({ cId = '', contentPlay = null }) {
   const ctaLink = contentPlay?.cta_link || undefined;
 
   return (
-    <MobileContainer backdropImage="/bg2.png">
+    <MobileContainer backdropImage="/bg7.png">
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
           {page === 'briefing' ? (
@@ -371,10 +372,11 @@ function TpPage({ cId = '', contentPlay = null }) {
                   >
                     <ArrowLeft className="w-5 h-5 text-sothebys-navy drop-shadow-sm" />
                   </button>
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-sothebys-navy text-white flex items-center justify-center font-serif text-xs rounded-lg shadow-lg">L</div>
-                    <span className="font-semibold text-sothebys-navy tracking-tight drop-shadow-sm">Concierge Leo</span>
-                  </div>
+                  <AssistantIdentity
+                    label="Bruce Lee"
+                    imageClassName="shadow-lg"
+                    textClassName="drop-shadow-sm"
+                  />
                 </div>
               </header>
 

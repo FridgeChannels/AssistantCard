@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import TpPage from './pages/TpPage.jsx'
+import ActivationPage from './pages/ActivationPage.jsx'
 import { getMagnetBySn } from './lib/magnetIdService.js'
 import { apiGetContentPlayById } from './api/backendClient.js'
 import { MobileContainer } from './components/layout/MobileContainer.jsx'
@@ -33,7 +34,7 @@ function AppWithRouter() {
         const data = await getMagnetBySn(sn, { signal: controller.signal })
         if (!cancelled) {
           setMagnetId(data?.id ?? '')
-          setMagnetContext(data ? { solution: data.solution, cta: data.cta, industry_id: data.industry_id, assistant_config: data.assistant_config ?? null } : null)
+          setMagnetContext(data ? { solution: data.solution, cta: data.cta, industry_id: data.industry_id, assistant_config: data.assistant_config ?? null, assistant_prompt_label: data.assistant_prompt_label ?? null, background_image_url: data.background_image_url ?? null } : null)
           setMagnetInfo(data)
         }
       } catch (e) {
@@ -59,7 +60,7 @@ function AppWithRouter() {
 
   if (loading) {
     return (
-      <MobileContainer backdropImage="/bg2.png">
+      <MobileContainer>
         <div className="flex-1 flex flex-col items-center justify-center text-sothebys-navy/80">
           <div className="w-8 h-8 border-2 border-sothebys-navy/30 border-t-sothebys-navy rounded-full animate-spin" />
         </div>
@@ -124,7 +125,7 @@ function TpPageWithRouter() {
 
   if (status === 'loading') {
     return (
-      <MobileContainer backdropImage="/bg2.png">
+      <MobileContainer backdropImage="/bg7.png">
         <div className="flex-1 flex flex-col items-center justify-center text-sothebys-navy/80">
           <div className="w-8 h-8 border-2 border-sothebys-navy/30 border-t-sothebys-navy rounded-full animate-spin" />
           <p className="mt-4 text-sm">Loading...</p>
@@ -135,7 +136,7 @@ function TpPageWithRouter() {
 
   if (status === 'error') {
     return (
-      <MobileContainer backdropImage="/bg2.png">
+      <MobileContainer backdropImage="/bg7.png">
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center text-sothebys-navy/80">
           <p className="text-sm">Content not found or link has expired.</p>
         </div>
@@ -153,6 +154,8 @@ createRoot(document.getElementById('root')).render(
       <Route path="/p/:sn?" element={<AppWithRouter />} />
       {/* URL 使用 content_play 表主键 id，例如 /tp/123 */}
       <Route path="/tp/:id" element={<TpPageWithRouter />} />
+      {/* 激活码页面 */}
+      <Route path="/activate" element={<ActivationPage />} />
     </Routes>
   </BrowserRouter>,
 )

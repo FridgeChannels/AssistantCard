@@ -21,4 +21,36 @@
   .safe-area-inset-top {
     padding-top: env(safe-area-inset-top, 0);
   }
+  
+  /* 按钮按下反馈：按下瞬间轻微缩放 */
+  button {
+    @apply transition-transform duration-150 ease-out;
+    touch-action: manipulation;
+  }
+  button:active {
+    transform: scale(0.97);
+  }
+}
+
+@layer components {
+  /* 用于充当按钮的 <a> 等元素 */
+  .btn-press:active {
+    transform: scale(0.97);
+  }
+  .btn-press {
+    @apply transition-transform duration-150 ease-out;
+    touch-action: manipulation;
+  }
+
+  /* 单行标题过长时：右→左滚完一段后停顿再重复（--marquee-offset 由 JS 注入） */
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    40% { transform: translateX(var(--marquee-offset, 0)); }
+    50% { transform: translateX(var(--marquee-offset, 0)); }
+    51% { transform: translateX(0); }
+    100% { transform: translateX(0); }
+  }
+  .animate-marquee-scroll {
+    animation: marquee-scroll 30s linear infinite;
+  }
 }
