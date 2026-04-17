@@ -51,6 +51,8 @@ export function MorningBriefing({
     ctaLink,
     disableRelatedQuestions = false,
     initialLocation = null,
+    /** 背景图预加载完成后再展示播放器区域（由 App / MobileContainer 驱动） */
+    backdropReady = true,
 }) {
     const [isPlaying, setIsPlaying] = useState(false);
     // Initial playContent: list-response cache is hydrated in effect; single-item/legacy cache used as-is
@@ -485,8 +487,23 @@ export function MorningBriefing({
             {/* Main Content - Scrollable */}
             <div className="flex-1 overflow-y-auto no-scrollbar">
                 <div className="flex flex-col items-center justify-center px-6 pb-24 min-h-full">
+                    {/* 背景图预加载中：仅展示加载态，不展示播放器文案与控件 */}
+                    {!backdropReady && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col items-center justify-center w-full max-w-md py-16"
+                        >
+                            <div
+                                className="w-12 h-12 rounded-full border-4 border-white/25 border-t-white animate-spin mb-4"
+                                aria-hidden
+                            />
+                            <p className="text-sm text-white/90 text-center">Loading…</p>
+                        </motion.div>
+                    )}
+
                     {/* Loading State */}
-                    {isLoading && (
+                    {backdropReady && isLoading && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -500,7 +517,7 @@ export function MorningBriefing({
                     )}
 
                     {/* Error State */}
-                    {error && !isLoading && (
+                    {backdropReady && error && !isLoading && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -515,7 +532,7 @@ export function MorningBriefing({
                     )}
 
                     {/* Content Card */}
-                    {playContent && !isLoading && !error && (
+                    {backdropReady && playContent && !isLoading && !error && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -697,7 +714,7 @@ export function MorningBriefing({
                     )}
 
                     {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
-                    {hasZipPermission && !hideLocationSelector && !showOnboarding && (
+                    {backdropReady && hasZipPermission && !hideLocationSelector && !showOnboarding && (
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
@@ -719,7 +736,7 @@ export function MorningBriefing({
                     )}
 
                     {/* 底部 CTA 按钮区：第1 站内 Chat / 第2 第三方 chat_url / 第3 打电话 / 第4 发短信 / 第5 发邮件 / 第6 skip_url */}
-                    {!showOnboarding && (
+                    {backdropReady && !showOnboarding && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}

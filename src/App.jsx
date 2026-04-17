@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MobileContainer } from './components/layout/MobileContainer';
+import { MobileContainer, backdropNeedsPreload } from './components/layout/MobileContainer';
 import { InputSection } from './components/interaction/InputSection';
 import { AnswerCard } from './components/cards/AnswerCard';
 import { TextMeSheet } from './components/escalation/TextMeSheet';
@@ -44,7 +44,26 @@ function parseAnswerWithMethod(text) {
   return { text, answerMethod: null };
 }
 
+function getCurrentBackdrop(magnetContext, sn) {
+  return isSegwayBackdropSn(sn)
+    ? segwayLogo
+    : (magnetContext?.background_image_url || '/bg7.png');
+}
+
 function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  }) {
+  const currentBackdrop = getCurrentBackdrop(magnetContext, sn);
+  const [backdropReady, setBackdropReady] = useState(
+    () => !backdropNeedsPreload(getCurrentBackdrop(magnetContext, sn), sn)
+  );
+
+  const handleBackdropStatusChange = useCallback(({ status }) => {
+    setBackdropReady(status === 'ready');
+  }, []);
+
+  useEffect(() => {
+    setBackdropReady(!backdropNeedsPreload(currentBackdrop, sn));
+  }, [currentBackdrop, sn]);
+
   const [page, setPage] = useState('briefing'); // 'selector' | 'briefing' | 'chat' | 'musicChat' | 'history'
   const [userRole, setUserRole] = useState('buyer'); // 'buyer' | 'seller' | null - 默认设为 buyer
   const [selectedLocation, setSelectedLocation] = useState(initialLocation); // Location selection for Morning Briefing
@@ -450,12 +469,11 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     }
   };
 
-  const currentBackdrop = isSegwayBackdropSn(sn)
-    ? segwayLogo
-    : (magnetContext?.background_image_url || '/bg7.png');
-
   return (
-    <MobileContainer backdropImage={currentBackdrop}>
+    <MobileContainer
+      backdropImage={currentBackdrop}
+      onBackdropStatusChange={handleBackdropStatusChange}
+    >
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         <AnimatePresence mode="wait">
@@ -485,6 +503,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                 cId={cId}
                 sn={sn}
                 magnetContext={magnetContext}
+                backdropReady={backdropReady}
                 hasPreloaded={hasPreloadedQuestionsRef.current}
                 cachedPlayContent={playContentCacheRef.current}
                 isLoadingPlayContent={isLoadingPlayContentRef.current}

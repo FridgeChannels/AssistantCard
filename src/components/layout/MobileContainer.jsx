@@ -1,40 +1,87 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
+import { isSegwayBackdropSn } from '../../config/env';
 
-/** 默认背景图：不预加载，直接展示 */
+/** 默认背景图 */
 const DEFAULT_BACKDROP = '/bg7.png';
 const isDefaultBackdrop = (url) =>
   !url || url === DEFAULT_BACKDROP || (typeof url === 'string' && url.endsWith('bg7.png'));
 
 /**
- * 主布局容器：支持可选背景图；自定义 URL 时预加载后再展示，失败回退 /bg7.png，避免闪烁。
+ * 是否需要先预加载再展示（自定义远程图、Segway 资源等；本地 bg7 不需要）
+ * @param {string|null|undefined} backdropImage
+ * @param {string} [sn='']
+ */
+export function backdropNeedsPreload(backdropImage, sn = '') {
+  if (isSegwayBackdropSn(sn)) return true;
+  if (!backdropImage) return false;
+  const s = String(backdropImage);
+  if (s === DEFAULT_BACKDROP || s.endsWith('bg7.png')) return false;
+  return true;
+}
+
+/**
+ * 主布局容器：支持可选背景图；有非默认地址时优先预加载该图，失败则预加载 bg7 再展示；默认 bg7 直接展示。
  * @param {React.ReactNode} children
  * @param {string} [className]
- * @param {string|null} [backdropImage=null] - 背景图 URL；空则无图；自定义 URL 时预加载并预加载 bg7 以备回退
+ * @param {string|null} [backdropImage=null] - 背景图 URL
+ * @param {(payload: { status: 'loading' | 'ready' }) => void} [onBackdropStatusChange] - 预加载阶段通知（用于延后展示前景内容）
  */
-export function MobileContainer({ children, className, backdropImage = null }) {
+export function MobileContainer({ children, className, backdropImage = null, onBackdropStatusChange }) {
   // 自定义 URL 时：{ url: 当前请求的 URL, displayed: 实际要展示的 URL }，仅当 url === backdropImage 时使用 displayed
   const [displayedFor, setDisplayedFor] = useState({ url: null, displayed: null });
 
   useEffect(() => {
-    if (!backdropImage || isDefaultBackdrop(backdropImage)) return;
-    // 自定义 URL：先清空展示，预加载自定义图与 bg7（bg7 仅备回退，不展示）
-    setDisplayedFor({ url: backdropImage, displayed: null });
-    const img = new Image();
-    const bg7 = new Image();
-    bg7.src = DEFAULT_BACKDROP;
     let cancelled = false;
+    const notify = (status) => {
+      if (!cancelled && typeof onBackdropStatusChange === 'function') {
+        onBackdropStatusChange({ status });
+      }
+    };
+
+    if (!backdropImage || isDefaultBackdrop(backdropImage)) {
+      setDisplayedFor({ url: backdropImage || null, displayed: backdropImage || null });
+      notify('ready');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // 非默认：优先加载给定地址，失败则切换为 bg7（先等 bg7 onload 再展示，减少闪屏）
+    notify('loading');
+    setDisplayedFor({ url: backdropImage, displayed: null });
+
+    const applyFallback = () => {
+      const fallback = new Image();
+      fallback.onload = () => {
+        if (cancelled) return;
+        setDisplayedFor({ url: backdropImage, displayed: DEFAULT_BACKDROP });
+        notify('ready');
+      };
+      fallback.onerror = () => {
+        if (cancelled) return;
+        setDisplayedFor({ url: backdropImage, displayed: DEFAULT_BACKDROP });
+        notify('ready');
+      };
+      fallback.src = DEFAULT_BACKDROP;
+    };
+
+    const img = new Image();
     img.onload = () => {
-      if (!cancelled) setDisplayedFor({ url: backdropImage, displayed: backdropImage });
+      if (cancelled) return;
+      setDisplayedFor({ url: backdropImage, displayed: backdropImage });
+      notify('ready');
     };
     img.onerror = () => {
-      if (!cancelled) setDisplayedFor({ url: backdropImage, displayed: DEFAULT_BACKDROP });
+      if (cancelled) return;
+      applyFallback();
     };
     img.src = backdropImage;
+
     return () => {
       cancelled = true;
     };
-  }, [backdropImage]);
+  }, [backdropImage, onBackdropStatusChange]);
 
   const effectiveUrl =
     isDefaultBackdrop(backdropImage)
