@@ -584,7 +584,7 @@ export function registerApiRoutes(app, supabase) {
           });
 
           const permissions = [...permSet].sort();
-          console.log(`[by-sn] SN=${sn}, industry_solution_id=${industrySolutionId}, permissions count=${permissions.length}, permissions=`, permissions);
+          // console.log(`[by-sn] SN=${sn}, industry_solution_id=${industrySolutionId}, permissions count=${permissions.length}, permissions=`, permissions);
 
           payload.industry_id = solutionRow.industry_id ?? null;
           payload.solution = {
@@ -892,16 +892,24 @@ export function registerApiRoutes(app, supabase) {
   app.get('/api/play-content/list', async (req, res) => {
     const { sn, magnetId: magnetIdQuery, debug: debugQuery } = req.query;
     const includeDebug = debugQuery === '1' || debugQuery === 'true';
+    const listLog = (...args) => {/* console.log('[play-content/list]', ...args); */};
 
     const toItem = (row) => ({
       id: row.id,
       title: row.headline,
       audio_url: row.audio_url,
+      order_index: row.order_index,
     });
 
     try {
       const timing = createServerTiming();
       let magnet = null;
+
+      listLog('start', {
+        sn: sn ?? null,
+        magnetIdQuery: magnetIdQuery ?? null,
+        includeDebug,
+      });
 
       if (sn) {
         const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_sn', () =>
@@ -912,6 +920,7 @@ export function registerApiRoutes(app, supabase) {
             .maybeSingle(),
         );
         if (!magnetErr) magnet = m;
+        listLog('magnet by sn', { sn, error: magnetErr ?? null, row: magnet ?? null });
       } else if (magnetIdQuery) {
         const { data: m, error: magnetErr } = await timing.time('sb_magnet_by_id', () =>
           supabase
@@ -921,12 +930,14 @@ export function registerApiRoutes(app, supabase) {
             .maybeSingle(),
         );
         if (!magnetErr) magnet = m;
+        listLog('magnet by id', { magnetIdQuery, error: magnetErr ?? null, row: magnet ?? null });
       }
 
       const hasZipCode = !!(magnet?.zip_code);
       const locationFormatted = magnet?.formatted ?? null;
 
       if (!magnet) {
+        listLog('branch', { name: 'no_magnet', hasZipCode: false, itemsCount: 0 });
         setCacheSeconds(res, 60, 300);
         timing.setHeader(res);
         const payload = {
@@ -940,6 +951,11 @@ export function registerApiRoutes(app, supabase) {
       }
 
       const categoryCodes = await fetchPlayContentCategoryCodes(supabase, magnet.magnet_config_id, timing);
+      listLog('categoryCodes from rel_magnetconfig_contentcategory', {
+        magnet_config_id: magnet.magnet_config_id,
+        count: categoryCodes.length,
+        codes: categoryCodes,
+      });
 
       const { data: playConfig, error: configErr } = await timing.time('sb_play_content_config', () =>
         supabase
@@ -951,8 +967,22 @@ export function registerApiRoutes(app, supabase) {
           .maybeSingle(),
       );
 
+      listLog('magnet_play_content_configs (latest by created_at)', {
+        magnet_config_id: magnet.magnet_config_id,
+        error: configErr ?? null,
+        row: playConfig ?? null,
+      });
+
       if (configErr || !playConfig) {
+        listLog('branch', {
+          name: 'no_config_or_error',
+          detail: configErr ? 'config query error' : 'no row',
+        });
         const selectCols = 'id, headline, audio_url, order_index';
+        const useCategory = categoryCodes.length > 0;
+        listLog('query play_news_contents (latest path)', {
+          filter: useCategory ? 'content_category_code IN categoryCodes' : 'applyPlayNewsContentsFallbackFilters',
+        });
         let latestQuery =
           categoryCodes.length > 0
             ? supabase.from('play_news_contents').select(selectCols).in('content_category_code', categoryCodes)
@@ -962,21 +992,32 @@ export function registerApiRoutes(app, supabase) {
         );
         if (latestErr) {
           console.error('Error querying play_news_contents (latest):', latestErr);
+          listLog('error', { step: 'sb_play_latest', message: latestErr.message });
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
         let rows = Array.isArray(latest) ? latest : (latest ? [latest] : []);
+        listLog('latest primary result', { rowCount: rows.length, ids: rows.map((r) => r?.id) });
         if (categoryCodes.length > 0 && rows.length === 0) {
+          listLog('latest empty with category → fallback query (no category filter)');
           const fbQ = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectCols));
           const { data: fbRows, error: fbErr } = await timing.time('sb_play_latest_fb', () =>
             fbQ.order('order_index', { ascending: true }),
           );
           if (fbErr) {
             console.error('Error querying play_news_contents (latest fallback):', fbErr);
+            listLog('error', { step: 'sb_play_latest_fb', message: fbErr.message });
             return res.status(500).json({ error: 'Failed to query play_news_contents' });
           }
           rows = Array.isArray(fbRows) ? fbRows : (fbRows ? [fbRows] : []);
+          listLog('latest fallback result', { rowCount: rows.length, ids: rows.map((r) => r?.id) });
         }
         const items = rows.map(toItem);
+        listLog('response', {
+          playback_rule: 'latest',
+          itemsCount: items.length,
+          orderIndexes: items.map((i) => i.order_index),
+          hasZipCode,
+        });
         setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
         timing.setHeader(res);
         const payloadLatest = {
@@ -1003,9 +1044,18 @@ export function registerApiRoutes(app, supabase) {
         String(playConfig.source_type).toLowerCase() === 'file' &&
         String(playConfig.processing_type).toLowerCase() === 'once';
 
-      const selectCols = 'id, headline, audio_url';
+      listLog('config flags', {
+        configId,
+        source_type: playConfig.source_type,
+        processing_type: playConfig.processing_type,
+        isRss,
+        isLongText,
+      });
+
+      const selectCols = 'id, headline, audio_url, order_index';
 
       if (isRss) {
+        listLog('branch', { name: 'rss', query: 'play_news_contents by config_id, order_index DESC LIMIT 1', configId });
         const { data: rows, error: rssErr } = await timing.time('sb_play_rss', () =>
           supabase
             .from('play_news_contents')
@@ -1016,9 +1066,16 @@ export function registerApiRoutes(app, supabase) {
         );
         if (rssErr) {
           console.error('Error querying play_news_contents (rss):', rssErr);
+          listLog('error', { step: 'sb_play_rss', message: rssErr.message });
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
         const items = (rows?.length > 0) ? [toItem(rows[0])] : [];
+        listLog('response', {
+          playback_rule: 'rss',
+          itemsCount: items.length,
+          orderIndexes: items.map((i) => i.order_index),
+          hasZipCode,
+        });
         setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
         timing.setHeader(res);
         const payloadRss = {
@@ -1032,6 +1089,11 @@ export function registerApiRoutes(app, supabase) {
       }
 
       if (isLongText) {
+        listLog('branch', {
+          name: 'long_text_sequential',
+          query: 'play_news_contents by config_id, order_index ASC (all)',
+          configId,
+        });
         const { data: rows, error: ltErr } = await timing.time('sb_play_longtext', () =>
           supabase
             .from('play_news_contents')
@@ -1041,9 +1103,16 @@ export function registerApiRoutes(app, supabase) {
         );
         if (ltErr) {
           console.error('Error querying play_news_contents (long text):', ltErr);
+          listLog('error', { step: 'sb_play_longtext', message: ltErr.message });
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
         const items = (rows ?? []).map(toItem);
+        listLog('response', {
+          playback_rule: 'long_text_sequential',
+          itemsCount: items.length,
+          orderIndexes: items.map((i) => i.order_index),
+          hasZipCode,
+        });
         setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
         timing.setHeader(res);
         const payloadLt = {
@@ -1057,7 +1126,18 @@ export function registerApiRoutes(app, supabase) {
         return res.json(payloadLt);
       }
 
+      listLog('branch', {
+        name: 'config_not_rss_or_longtext',
+        note: 'fallback to play_news_contents like no-config latest',
+        configId,
+        source_type: playConfig.source_type,
+        processing_type: playConfig.processing_type,
+      });
       const selectColsFallback = 'id, headline, audio_url, order_index';
+      const useCategoryFb = categoryCodes.length > 0;
+      listLog('query play_news_contents (fallback latest path)', {
+        filter: useCategoryFb ? 'content_category_code IN categoryCodes' : 'applyPlayNewsContentsFallbackFilters',
+      });
       let fallbackQuery =
         categoryCodes.length > 0
           ? supabase.from('play_news_contents').select(selectColsFallback).in('content_category_code', categoryCodes)
@@ -1067,21 +1147,33 @@ export function registerApiRoutes(app, supabase) {
       );
       if (fallbackErr) {
         console.error('Error querying play_news_contents (fallback):', fallbackErr);
+        listLog('error', { step: 'sb_play_fallback', message: fallbackErr.message });
         return res.status(500).json({ error: 'Failed to query play_news_contents' });
       }
       let fallbackRows = Array.isArray(fallback) ? fallback : (fallback ? [fallback] : []);
+      listLog('fallback primary result', { rowCount: fallbackRows.length, ids: fallbackRows.map((r) => r?.id) });
       if (categoryCodes.length > 0 && fallbackRows.length === 0) {
+        listLog('fallback empty with category → second query (no category filter)');
         const fbQ = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectColsFallback));
         const { data: fbData, error: fbErr } = await timing.time('sb_play_fallback_fb', () =>
           fbQ.order('order_index', { ascending: true }),
         );
         if (fbErr) {
           console.error('Error querying play_news_contents (fallback fb):', fbErr);
+          listLog('error', { step: 'sb_play_fallback_fb', message: fbErr.message });
           return res.status(500).json({ error: 'Failed to query play_news_contents' });
         }
         fallbackRows = Array.isArray(fbData) ? fbData : (fbData ? [fbData] : []);
+        listLog('fallback secondary result', { rowCount: fallbackRows.length, ids: fallbackRows.map((r) => r?.id) });
       }
       const items = fallbackRows.map(toItem);
+      listLog('response', {
+        playback_rule: 'latest',
+        itemsCount: items.length,
+        orderIndexes: items.map((i) => i.order_index),
+        hasZipCode,
+        reason: 'config_not_rss_or_longtext',
+      });
       setCacheSeconds(res, items.length ? 300 : 60, items.length ? 600 : 300);
       timing.setHeader(res);
       const payloadFallback = {
@@ -1103,6 +1195,7 @@ export function registerApiRoutes(app, supabase) {
       return res.json(payloadFallback);
     } catch (err) {
       console.error('Unexpected error in /api/play-content/list', err);
+      // console.log('[play-content/list]', 'fatal', err?.message ?? err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });

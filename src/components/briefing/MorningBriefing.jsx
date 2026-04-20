@@ -2,14 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Play, Pause, AlertCircle, MessageCircle, Link as LinkIcon, Phone, Mail, MessageSquare } from 'lucide-react';
 import { getPlayContentList } from '../../lib/playContentService';
-
-/** localStorage key 用于顺序播放当前索引。configId 可为 number（long_text 的 config_id）或 'latest'（latest 多条顺序播） */
-const PLAY_INDEX_KEY_PREFIX = 'play_content_index_';
-function playIndexStorageKey(snOrCId, configId) {
-    const id = snOrCId != null && snOrCId !== '' ? String(snOrCId) : null;
-    if (id == null || configId == null) return null;
-    return `${PLAY_INDEX_KEY_PREFIX}${id}_${configId}`;
-}
+import { pickPlayContentItemByLocalCalendar } from '../../lib/playContentSlot';
 import { runStarterWorkflow } from '../../lib/relatedQuestionsService';
 import { createPlayContentLog, updatePlayContentLog } from '../../lib/loggingService';
 import { AssistantIdentity } from '../layout/AssistantIdentity';
@@ -182,30 +175,16 @@ export function MorningBriefing({
             return;
         }
 
-        // 顺序列表：long_text_sequential（有 config_id）或 latest 多条（key 用 'latest'），同一套流程
-        const isSequentialList =
+        // 顺序列表：long_text_sequential（有 config_id）或 latest 多条；按本地日 + order_index 槽位选一条，播完不换条
+        const isOrderSlotList =
             (rule === 'long_text_sequential' && items?.length > 0 && cachedPlayContent.config_id != null) ||
             (rule === 'latest' && items?.length > 1);
-        const sequentialKey = isSequentialList
-            ? playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? cachedPlayContent.config_id : 'latest')
-            : null;
-        if (sequentialKey) {
-            const key = sequentialKey;
-            const N = items.length;
-            const cachedIdx = cachedPlayContent.currentLongTextIndex;
-            let idx = (cachedIdx != null && Number.isInteger(cachedIdx) && cachedIdx >= 0 && cachedIdx < N)
-                ? cachedIdx
-                : parseInt(localStorage.getItem(key), 10);
-            if (Number.isNaN(idx) || idx < 0 || idx >= N) idx = 0;
-            currentLongTextIndexRef.current = idx;
-            const item = items[idx];
-            applyItem(item, item?.audio_url, () => {
-                const current = parseInt(localStorage.getItem(key), 10);
-                const next = Number.isNaN(current) ? 0 : (current + 1) % N;
-                localStorage.setItem(key, String(next));
-                currentLongTextIndexRef.current = next;
-                if (onLongTextIndexChange) onLongTextIndexChange(next);
-            });
+        if (isOrderSlotList) {
+            const { item, arrayIndex } = pickPlayContentItemByLocalCalendar(items);
+            if (!item) return;
+            currentLongTextIndexRef.current = arrayIndex;
+            if (onLongTextIndexChange) onLongTextIndexChange(arrayIndex);
+            applyItem(item, item?.audio_url, null);
             return;
         }
 
@@ -236,7 +215,7 @@ export function MorningBriefing({
                 return audio;
             });
         }
-    }, [cachedPlayContent, cId, onLongTextIndexChange]); // cId for long_text localStorage key
+    }, [cachedPlayContent, cId, onLongTextIndexChange]);
 
     // 组件卸载时的清理
     useEffect(() => {
@@ -292,9 +271,8 @@ export function MorningBriefing({
                 const locFormatted = locationFormatted ?? null;
 
                 let currentItem = null;
-                let longTextKey = null;
-                let longTextN = 0;
-                let longTextDisplayIndex = null; // 仅 longtext 时有值，供 onPlayContentLoaded 写入 cache
+                let isOrderSlotList = false;
+                let longTextDisplayIndex = null; // order_slot 列表时写入 cache 的 items 下标
 
                 // 单条：rss 或 latest 仅一条
                 if (rule === 'rss' || (rule === 'latest' && items.length <= 1)) {
@@ -303,24 +281,12 @@ export function MorningBriefing({
                     (rule === 'long_text_sequential' && items.length > 0 && configId != null) ||
                     (rule === 'latest' && items.length > 1)
                 ) {
-                    // 顺序列表：long_text 用 config_id，latest 多条用 key 'latest'
-                    longTextKey = playIndexStorageKey(sn || cId, rule === 'long_text_sequential' ? configId : 'latest');
-                    if (!longTextKey) { hasLoadedPlayContent.current = false; return; }
-                    longTextN = items.length;
-                    const N = items.length;
-                    let idx = parseInt(localStorage.getItem(longTextKey), 10);
-                    let displayIdx;
-                    if (Number.isNaN(idx) || idx < 0 || idx >= N) {
-                        displayIdx = 0;
-                        localStorage.setItem(longTextKey, String(0));
-                        currentItem = items[0] ?? null;
-                    } else {
-                        displayIdx = (idx + 1) % N;
-                        localStorage.setItem(longTextKey, String(displayIdx));
-                        currentItem = items[displayIdx] ?? null;
-                    }
-                    longTextDisplayIndex = displayIdx;
-                    currentLongTextIndexRef.current = displayIdx;
+                    isOrderSlotList = true;
+                    const pick = pickPlayContentItemByLocalCalendar(items);
+                    currentItem = pick.item;
+                    longTextDisplayIndex = pick.arrayIndex >= 0 ? pick.arrayIndex : null;
+                    currentLongTextIndexRef.current = pick.arrayIndex >= 0 ? pick.arrayIndex : null;
+                    if (onLongTextIndexChange && pick.arrayIndex >= 0) onLongTextIndexChange(pick.arrayIndex);
                 }
 
                 if (!currentItem) {
@@ -353,21 +319,14 @@ export function MorningBriefing({
                 if (content.audio_url) {
                     const audio = new Audio(content.audio_url);
                     audio.addEventListener('ended', () => {
-                        if (longTextKey && longTextN > 0) console.log('audio ended', { longtext: true });
+                        if (isOrderSlotList) console.log('audio ended', { orderSlotList: true });
                         setIsPlaying(false);
-                        if (longTextKey && longTextN > 0) {
-                            const idx = parseInt(localStorage.getItem(longTextKey), 10);
-                            const next = Number.isNaN(idx) ? 0 : (idx + 1) % longTextN;
-                            localStorage.setItem(longTextKey, String(next));
-                            currentLongTextIndexRef.current = next;
-                            if (onLongTextIndexChange) onLongTextIndexChange(next);
-                        }
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
                         setError('Audio is not ready yet');
                     });
-                    if (longTextKey && longTextN > 0) {
+                    if (isOrderSlotList) {
                         const onTimeUpdate = () => {
                             if (audio.duration && !Number.isNaN(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration) {
                                 setIsPlaying(false);

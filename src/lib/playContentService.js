@@ -54,7 +54,7 @@ export async function getPlayContentWithMeta(opts = null) {
 /**
  * 获取播放内容列表（三种规则：long_text_sequential / rss / latest），供 MorningBriefing 使用
  * @param {{ sn?: string | null, magnetId?: string | null }} opts
- * @returns {Promise<{ playback_rule: string, items: Array<{ id, title, audio_url }>, config_id?: number, hasZipCode?: boolean, locationFormatted?: string | null } | null>}
+ * @returns {Promise<{ playback_rule: string, items: Array<{ id, title, audio_url, order_index?: number }>, config_id?: number, hasZipCode?: boolean, locationFormatted?: string | null } | null>}
  */
 export async function getPlayContentList(opts = null) {
     try {

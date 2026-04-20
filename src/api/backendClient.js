@@ -161,7 +161,7 @@ export async function apiGetTodayPlayContent(opts = {}) {
 /**
  * 获取播放内容列表（三种规则：long_text_sequential / rss / latest）
  * @param {{ sn?: string | null, magnetId?: string | null }} opts
- * @returns {Promise<{ playback_rule: string, items: Array<{ id, title, audio_url }>, config_id?: number, hasZipCode?: boolean, locationFormatted?: string | null } | null>}
+ * @returns {Promise<{ playback_rule: string, items: Array<{ id, title, audio_url, order_index?: number }>, config_id?: number, hasZipCode?: boolean, locationFormatted?: string | null } | null>}
  */
 export async function apiGetPlayContentList(opts = {}) {
   const { sn = null, magnetId = null } = typeof opts === 'object' && opts !== null ? opts : { magnetId: opts };
