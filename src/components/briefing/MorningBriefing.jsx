@@ -22,6 +22,7 @@ import {
     hasAllPermissions,
     hasAnyAssistantPermission,
 } from '../../lib/ctaPermissions';
+import { isMinimalChromeSn } from '../../config/env';
 
 const DEFAULT_ASSISTANT_CTA_LABEL = 'Explore More';
 const renderDefaultAssistantCtaIcon = () => (
@@ -476,7 +477,7 @@ export function MorningBriefing({
             </AnimatePresence>
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
-                {sn !== '1' && (
+                {!isMinimalChromeSn(sn) && (
                   <AssistantIdentity
                       label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
                       imageClassName="shadow-sm"

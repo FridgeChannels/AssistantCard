@@ -792,14 +792,17 @@ export function registerApiRoutes(app, supabase) {
         });
       }
 
-      if (zipCode && categoryCodes.length > 0) {
-        let byZipQuery = supabase
-          .from('play_news_contents')
-          .select(selectCols)
-          .eq('zip_code', zipCode)
-          .in('content_category_code', categoryCodes);
+      if (zipCode) {
+        let byZipQuery = supabase.from('play_news_contents').select(selectCols).eq('zip_code', zipCode);
+        if (categoryCodes.length > 0) {
+          byZipQuery = byZipQuery.in('content_category_code', categoryCodes);
+        }
         if (debug) {
-          console.log('[play-contents] 查询1 条件: zip_code=%s, content_category_code in %j', zipCode, categoryCodes);
+          console.log(
+            '[play-contents] 查询1 条件: zip_code=%s, content_category_code=%s',
+            zipCode,
+            categoryCodes.length > 0 ? categoryCodes : '(不限类目)',
+          );
         }
         const { data: byZip, error: zipErr } = await timing.time('sb_play_by_zip', () =>
           byZipQuery.order('created_at', orderOpt).limit(1),
@@ -824,37 +827,41 @@ export function registerApiRoutes(app, supabase) {
         }
       }
 
+      let latestQuery = supabase.from('play_news_contents').select(selectCols);
       if (categoryCodes.length > 0) {
-        let latestQuery = supabase.from('play_news_contents').select(selectCols).in('content_category_code', categoryCodes);
-        if (debug) {
-          console.log('[play-contents] 查询2 条件: content_category_code in %j', categoryCodes);
-        }
-        const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
-          latestQuery.order('created_at', orderOpt).limit(1),
+        latestQuery = latestQuery.in('content_category_code', categoryCodes);
+      }
+      if (debug) {
+        console.log(
+          '[play-contents] 查询2 条件: content_category_code=%s',
+          categoryCodes.length > 0 ? categoryCodes : '(不限类目)',
         );
-        if (debug) {
-          console.log(
-            '[play-contents] 查询2 结果: 条数=%s, error=%s, 首条=%s',
-            latest?.length ?? 0,
-            latestErr ? JSON.stringify(latestErr) : null,
-            latest?.[0] ?? null,
-          );
-        }
-        if (latestErr) {
-          console.error('Error querying play_news_contents:', latestErr);
-          return res.status(500).json({ error: 'Failed to query play_news_contents' });
-        }
+      }
+      const { data: latest, error: latestErr } = await timing.time('sb_play_latest', () =>
+        latestQuery.order('created_at', orderOpt).limit(1),
+      );
+      if (debug) {
+        console.log(
+          '[play-contents] 查询2 结果: 条数=%s, error=%s, 首条=%s',
+          latest?.length ?? 0,
+          latestErr ? JSON.stringify(latestErr) : null,
+          latest?.[0] ?? null,
+        );
+      }
+      if (latestErr) {
+        console.error('Error querying play_news_contents:', latestErr);
+        return res.status(500).json({ error: 'Failed to query play_news_contents' });
+      }
 
-        if (latest?.length > 0) {
-          setCacheSeconds(res, 300, 600);
-          timing.setHeader(res);
-          return res.json({
-            content: { id: latest[0].id, title: latest[0].headline, audio_url: latest[0].audio_url },
-            from: zipCode ? 'latest_fallback' : 'latest',
-            hasZipCode,
-            locationFormatted,
-          });
-        }
+      if (latest?.length > 0) {
+        setCacheSeconds(res, 300, 600);
+        timing.setHeader(res);
+        return res.json({
+          content: { id: latest[0].id, title: latest[0].headline, audio_url: latest[0].audio_url },
+          from: zipCode ? 'latest_fallback' : 'latest',
+          hasZipCode,
+          locationFormatted,
+        });
       }
 
       let fbQuery = applyPlayNewsContentsFallbackFilters(supabase.from('play_news_contents').select(selectCols));
