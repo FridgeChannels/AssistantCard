@@ -79,7 +79,8 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
   const [isLoadingStarterQuestions, setIsLoadingStarterQuestions] = useState(false); // 推荐问题加载状态
   const [starterNoAnswerTxt, setStarterNoAnswerTxt] = useState(null); // 预加载/首屏返回 no_answer 时存文案，进 chat 时插入首条助手消息
   const hasPreloadedQuestionsRef = useRef(false); // 标记是否已经懒加载过推荐问题
-  const playContentCacheRef = useRef(null); // 缓存播放内容，避免重复请求
+  const playContentCacheRef = useRef(null); // 与 playContentCache 同步，供非渲染逻辑读取
+  const [playContentCache, setPlayContentCache] = useState(null); // 触发重渲染，使 MorningBriefing 的 cachedPlayContent 与 ref 一致
   const isLoadingPlayContentRef = useRef(false); // 标记是否正在加载播放内容，防止并发请求
   const hasLoggedPageEnterRef = useRef(false); // 标记是否已记录页面进入日志
 
@@ -133,6 +134,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
     setStarterNoAnswerTxt(null); // 重置 no_answer 首条文案
     hasPreloadedQuestionsRef.current = false; // 重置懒加载标记
     playContentCacheRef.current = null; // 重置播放内容缓存（cId变化时需要重新加载）
+    setPlayContentCache(null);
     isLoadingPlayContentRef.current = false; // 重置加载状态
     prevChatHistoryLengthRef.current = 0; // 重置历史长度记录
   }, [userRole, cId]);
@@ -455,19 +457,28 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
 
   // Save playback state (current time, optional longtext index) when leaving briefing page
   const handleSavePlaybackState = (currentTime, longTextIndex) => {
-    if (playContentCacheRef.current) {
-      const next = { ...playContentCacheRef.current, savedCurrentTime: currentTime };
-      if (longTextIndex != null) next.currentLongTextIndex = longTextIndex;
-      playContentCacheRef.current = next;
+    if (!playContentCacheRef.current) return;
+    const prev = playContentCacheRef.current;
+    const next = { ...prev, savedCurrentTime: currentTime };
+    if (longTextIndex != null) next.currentLongTextIndex = longTextIndex;
+    if (
+      prev.savedCurrentTime === next.savedCurrentTime &&
+      prev.currentLongTextIndex === next.currentLongTextIndex
+    ) {
+      return;
     }
+    playContentCacheRef.current = next;
+    setPlayContentCache(next);
   };
 
-  // longtext 本页播完时同步 cache 索引，便于返回时同一条
-  const handleLongTextIndexChange = (nextIndex) => {
-    if (playContentCacheRef.current) {
-      playContentCacheRef.current = { ...playContentCacheRef.current, currentLongTextIndex: nextIndex };
-    }
-  };
+  // longtext 本页播完时同步 cache 索引，便于返回时同一条（stable，避免 MorningBriefing 缓存 effect 随父渲染反复跑）
+  const handleLongTextIndexChange = useCallback((nextIndex) => {
+    if (!playContentCacheRef.current) return;
+    if (playContentCacheRef.current.currentLongTextIndex === nextIndex) return;
+    const next = { ...playContentCacheRef.current, currentLongTextIndex: nextIndex };
+    playContentCacheRef.current = next;
+    setPlayContentCache(next);
+  }, []);
 
   return (
     <MobileContainer
@@ -491,9 +502,9 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
           ) : page === 'briefing' ? (
             <motion.div
               key="briefing"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
+              initial={{ x: 50 }}
+              animate={{ x: 0 }}
+              exit={{ x: -50 }}
               transition={{ duration: 0.4 }}
               className="flex-1 flex flex-col"
             >
@@ -505,7 +516,7 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                 magnetContext={magnetContext}
                 backdropReady={backdropReady}
                 hasPreloaded={hasPreloadedQuestionsRef.current}
-                cachedPlayContent={playContentCacheRef.current}
+                cachedPlayContent={playContentCache}
                 isLoadingPlayContent={isLoadingPlayContentRef.current}
                 onQuestionsPreloaded={(questions) => {
                   setStarterQuestions(questions);
@@ -516,8 +527,8 @@ function App({ cId = '', sn = '', magnetContext = null, initialLocation = null  
                   hasPreloadedQuestionsRef.current = true; // 预加载完成（no_answer 也算完成）
                 }}
                 onPlayContentLoaded={(content) => {
-                  // 缓存播放内容
                   playContentCacheRef.current = content;
+                  setPlayContentCache(content);
                   isLoadingPlayContentRef.current = false;
                 }}
                 onPlayContentLoadingChange={(loading) => {

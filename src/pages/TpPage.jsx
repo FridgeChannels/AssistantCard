@@ -44,6 +44,7 @@ function TpPage({ cId = '', contentPlay = null }) {
   const [isLoadingStarterQuestions, setIsLoadingStarterQuestions] = useState(false);
   const hasPreloadedQuestionsRef = useRef(false);
   const playContentCacheRef = useRef(null);
+  const [playContentCache, setPlayContentCache] = useState(null);
   const isLoadingPlayContentRef = useRef(false);
   const hasLoggedPageEnterRef = useRef(false);
 
@@ -93,6 +94,7 @@ function TpPage({ cId = '', contentPlay = null }) {
     setStarterQuestions([]);
     hasPreloadedQuestionsRef.current = false;
     playContentCacheRef.current = null;
+    setPlayContentCache(null);
     isLoadingPlayContentRef.current = false;
     prevChatHistoryLengthRef.current = 0;
   }, [cId]);
@@ -283,9 +285,12 @@ function TpPage({ cId = '', contentPlay = null }) {
 
   // 兼容第二参数 longTextIndex（TpPage 无 longtext 列表，仅用 currentTime）
   const handleSavePlaybackState = (currentTime, _longTextIndex) => {
-    if (playContentCacheRef.current) {
-      playContentCacheRef.current = { ...playContentCacheRef.current, savedCurrentTime: currentTime };
-    }
+    if (!playContentCacheRef.current) return;
+    const prev = playContentCacheRef.current;
+    const next = { ...prev, savedCurrentTime: currentTime };
+    if (prev.savedCurrentTime === next.savedCurrentTime) return;
+    playContentCacheRef.current = next;
+    setPlayContentCache(next);
   };
 
   // tp/:id 使用 content_play 表的数据作为播放内容来源
@@ -301,7 +306,7 @@ function TpPage({ cId = '', contentPlay = null }) {
         audio_url: contentPlay.audio_url,
         created_at: contentPlay.created_at,
       }
-    : playContentCacheRef.current;
+    : playContentCache;
 
   const ctaText = contentPlay?.cta_text || undefined;
   const ctaLink = contentPlay?.cta_link || undefined;
@@ -313,9 +318,9 @@ function TpPage({ cId = '', contentPlay = null }) {
           {page === 'briefing' ? (
             <motion.div
               key="briefing"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
+              initial={{ x: 50 }}
+              animate={{ x: 0 }}
+              exit={{ x: -50 }}
               transition={{ duration: 0.4 }}
               className="flex-1 flex flex-col"
             >
@@ -335,6 +340,7 @@ function TpPage({ cId = '', contentPlay = null }) {
                 }}
                 onPlayContentLoaded={(content) => {
                   playContentCacheRef.current = content;
+                  setPlayContentCache(content);
                   isLoadingPlayContentRef.current = false;
                 }}
                 onPlayContentLoadingChange={(loading) => {

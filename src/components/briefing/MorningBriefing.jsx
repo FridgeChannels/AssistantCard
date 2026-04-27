@@ -26,6 +26,100 @@ import { isMinimalChromeSn } from '../../config/env';
 
 const DEFAULT_ASSISTANT_CTA_LABEL = 'Explore More';
 
+/**
+ * `new Audio(url)` 后若立刻 `play()`，常见「响一下就没声」（缓冲未达 HAVE_FUTURE_DATA 即解码/欠载）。
+ * 等到 canplay / canplaythrough 再播，与「停一次再播就好」的现象一致。
+ */
+function waitUntilAudioPlayable(audio, timeoutMs = 20000) {
+    if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            audio.removeEventListener('canplay', onCanPlay);
+            audio.removeEventListener('canplaythrough', onThrough);
+            audio.removeEventListener('error', onErr);
+            resolve();
+        };
+        const onCanPlay = () => finish();
+        const onThrough = () => finish();
+        const onErr = () => finish();
+        const timer = setTimeout(finish, timeoutMs);
+        audio.addEventListener('canplay', onCanPlay);
+        audio.addEventListener('canplaythrough', onThrough);
+        audio.addEventListener('error', onErr);
+    });
+}
+
+function configurePlaybackAudio(audio) {
+    audio.preload = 'auto';
+}
+
+/**
+ * 首段缓冲播完后若后续数据未到会「假播放」：监听 waiting/stalled，续缓冲后自动 play() 恢复。
+ * getPlayIntent 为 true 时表示用户仍处于播放态（未主动暂停、未播完）。
+ */
+function attachPlayResumeAfterBuffer(audio, getPlayIntent) {
+    let awaitingData = false;
+
+    const tryResume = () => {
+        if (!awaitingData || !getPlayIntent() || audio.ended) return;
+        if (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+        audio.play().catch((e) => {
+            if (e?.name === 'AbortError') return;
+        });
+    };
+
+    const onWaiting = () => {
+        if (getPlayIntent()) awaitingData = true;
+    };
+    const onStalled = () => {
+        if (getPlayIntent()) awaitingData = true;
+    };
+    const onProgress = () => {
+        if (awaitingData) tryResume();
+    };
+    const onCanPlay = () => {
+        if (awaitingData) tryResume();
+    };
+    const onPlaying = () => {
+        awaitingData = false;
+    };
+    const onPause = () => {
+        if (!getPlayIntent()) awaitingData = false;
+    };
+    const onEnded = () => {
+        awaitingData = false;
+    };
+    const onEmptied = () => {
+        awaitingData = false;
+    };
+
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('stalled', onStalled);
+    audio.addEventListener('progress', onProgress);
+    audio.addEventListener('canplay', onCanPlay);
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('emptied', onEmptied);
+
+    return () => {
+        audio.removeEventListener('waiting', onWaiting);
+        audio.removeEventListener('stalled', onStalled);
+        audio.removeEventListener('progress', onProgress);
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('playing', onPlaying);
+        audio.removeEventListener('pause', onPause);
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('emptied', onEmptied);
+    };
+}
+
 export function MorningBriefing({
     onTalkToAssistant,
     onOpenAssistantPromptChat,
@@ -73,6 +167,7 @@ export function MorningBriefing({
     const currentPlayLogId = useRef(null); // 当前播放日志ID
     const playStartTime = useRef(null); // 播放开始时间
     const audioRef = useRef(null); // 用于cleanup中访问audioElement
+    const playIntentRef = useRef(false); // 用户期望在播（含缓冲欠载），供 attachPlayResumeAfterBuffer
     const currentLongTextIndexRef = useRef(null); // longtext 当前展示条索引，卸载/ended 时同步到父 cache
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
@@ -133,11 +228,13 @@ export function MorningBriefing({
                 setAudioElement(prev => {
                     if (prev) return prev;
                     const audio = new Audio(audioUrl);
+                    configurePlaybackAudio(audio);
                     if (cachedPlayContent.savedCurrentTime) {
                         audio.currentTime = cachedPlayContent.savedCurrentTime;
                     }
                     audio.addEventListener('ended', async () => {
                         if (onEnded) console.log('audio ended', { longtext: true });
+                        playIntentRef.current = false;
                         setIsPlaying(false);
                         if (currentPlayLogId.current && playStartTime.current) {
                             const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
@@ -150,12 +247,14 @@ export function MorningBriefing({
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
+                        playIntentRef.current = false;
                         setError('Audio is not ready yet');
                     });
                     // longtext 播完未停兜底：timeupdate 在 ended 未触发时同步 isPlaying
                     if (onEnded) {
                         const onTimeUpdate = () => {
                             if (audio.duration && !Number.isNaN(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration) {
+                                playIntentRef.current = false;
                                 setIsPlaying(false);
                                 audio.removeEventListener('timeupdate', onTimeUpdate);
                             }
@@ -183,7 +282,10 @@ export function MorningBriefing({
             const { item, arrayIndex } = pickPlayContentItemByLocalCalendar(items);
             if (!item) return;
             currentLongTextIndexRef.current = arrayIndex;
-            if (onLongTextIndexChange) onLongTextIndexChange(arrayIndex);
+            // 仅当与缓存里的索引不一致时再通知父组件，避免 setPlayContentCache → 新 props → 本 effect 死循环
+            if (onLongTextIndexChange && cachedPlayContent.currentLongTextIndex !== arrayIndex) {
+                onLongTextIndexChange(arrayIndex);
+            }
             applyItem(item, item?.audio_url, null);
             return;
         }
@@ -196,8 +298,10 @@ export function MorningBriefing({
             setAudioElement(prev => {
                 if (prev) return prev;
                 const audio = new Audio(cachedPlayContent.audio_url);
+                configurePlaybackAudio(audio);
                 if (cachedPlayContent.savedCurrentTime) audio.currentTime = cachedPlayContent.savedCurrentTime;
                 audio.addEventListener('ended', async () => {
+                    playIntentRef.current = false;
                     setIsPlaying(false);
                     if (currentPlayLogId.current && playStartTime.current) {
                         const duration = Math.floor((Date.now() - playStartTime.current) / 1000);
@@ -209,6 +313,7 @@ export function MorningBriefing({
                 });
                 audio.addEventListener('error', (e) => {
                     console.error('Audio loading issue:', e);
+                    playIntentRef.current = false;
                     setError('Audio is not ready yet');
                 });
                 audioRef.current = audio;
@@ -236,6 +341,7 @@ export function MorningBriefing({
                 }
 
                 // 暂停播放
+                playIntentRef.current = false;
                 audio.pause();
 
                 // 保存进度到父组件（longtext 时一并传当前索引，便于返回同一条）
@@ -318,17 +424,21 @@ export function MorningBriefing({
 
                 if (content.audio_url) {
                     const audio = new Audio(content.audio_url);
+                    configurePlaybackAudio(audio);
                     audio.addEventListener('ended', () => {
                         if (isOrderSlotList) console.log('audio ended', { orderSlotList: true });
+                        playIntentRef.current = false;
                         setIsPlaying(false);
                     });
                     audio.addEventListener('error', (e) => {
                         console.error('Audio loading issue:', e);
+                        playIntentRef.current = false;
                         setError('Audio is not ready yet');
                     });
                     if (isOrderSlotList) {
                         const onTimeUpdate = () => {
                             if (audio.duration && !Number.isNaN(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration) {
+                                playIntentRef.current = false;
                                 setIsPlaying(false);
                                 audio.removeEventListener('timeupdate', onTimeUpdate);
                             }
@@ -361,6 +471,11 @@ export function MorningBriefing({
         if (hasZipPermission && !hasZip && !skipped) setShowOnboarding(true);
     }, [magnetContext, playContent]);
 
+    useEffect(() => {
+        if (!audioElement) return undefined;
+        return attachPlayResumeAfterBuffer(audioElement, () => playIntentRef.current);
+    }, [audioElement]);
+
     const handlePlay = async () => {
         if (!audioElement) {
             console.warn('No audio available');
@@ -369,6 +484,7 @@ export function MorningBriefing({
 
         if (isPlaying) {
             // 暂停播放
+            playIntentRef.current = false;
             audioElement.pause();
             setIsPlaying(false);
 
@@ -383,14 +499,22 @@ export function MorningBriefing({
                 });
             }
         } else {
-            // 开始播放
-            audioElement.play().catch(err => {
+            // 先等到可播再 play，避免首击「只响一截」；再 await play()；pause 打断会抛 AbortError
+            try {
+                await waitUntilAudioPlayable(audioElement);
+                await audioElement.play();
+            } catch (err) {
+                if (err?.name === 'AbortError') {
+                    playIntentRef.current = false;
+                    return;
+                }
                 console.error('Playback issue:', err);
                 setError('Unable to play at this time');
-            });
+                playIntentRef.current = false;
+                return;
+            }
+            playIntentRef.current = true;
             setIsPlaying(true);
-
-            // 创建播放日志（写入 play_news_contents_id）
             playStartTime.current = Date.now();
             const logId = await createPlayContentLog({
                 cId: cId,
@@ -484,40 +608,27 @@ export function MorningBriefing({
             {/* Main Content - Scrollable */}
             <div className="flex-1 overflow-y-auto no-scrollbar">
                 <div className="flex flex-col items-center justify-center px-6 pb-24 min-h-full">
-                    {/* 背景图预加载中：仅展示加载态，不展示播放器文案与控件 */}
-                    {!backdropReady && (
+                    {/* 背景未就绪或播放内容加载中：与 main.jsx 路由首屏相同的 navy 转圈，视觉与第一段加载一致 */}
+                    {!error && (!backdropReady || isLoading) && (
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center w-full max-w-md py-16"
+                            initial={{ y: 12 }}
+                            animate={{ y: 0 }}
+                            transition={{ duration: 0.35 }}
+                            className="flex flex-col items-center justify-center w-full max-w-md py-16 text-sothebys-navy/80"
                         >
                             <div
-                                className="w-12 h-12 rounded-full border-4 border-white/25 border-t-white animate-spin mb-4"
+                                className="w-8 h-8 border-2 border-sothebys-navy/30 border-t-sothebys-navy rounded-full animate-spin"
                                 aria-hidden
                             />
-                            <p className="text-sm text-white/90 text-center">Loading…</p>
-                        </motion.div>
-                    )}
-
-                    {/* Loading State */}
-                    {backdropReady && isLoading && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="w-full max-w-md mb-6"
-                        >
-                            <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
-                                <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-800 rounded-full animate-spin mb-4"></div>
-                                <p className="text-gray-600">Loading...</p>
-                            </Glass>
                         </motion.div>
                     )}
 
                     {/* Error State */}
                     {backdropReady && error && !isLoading && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ y: 20 }}
+                            animate={{ y: 0 }}
+                            transition={{ duration: 0.4 }}
                             className="w-full max-w-md mb-6"
                         >
                             <Glass variant="panel" className="p-8 flex flex-col items-center justify-center">
@@ -531,23 +642,31 @@ export function MorningBriefing({
                     {/* Content Card */}
                     {backdropReady && playContent && !isLoading && !error && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ y: 20 }}
+                            animate={{ y: 0 }}
                             transition={{ duration: 0.5 }}
                             className="w-full max-w-md mb-3"
                         >
-                            <div className="p-8 flex flex-col justify-between w-full">
+                            <Glass
+                                variant="panel"
+                                className="p-8 flex flex-col justify-between"
+                                tintOpacity={0.2}
+                                borderOpacity={0.12}
+                                highlightEnabled={false}
+                            >
                                 <div className="flex flex-col items-center">
                                     {/* Title - single line, marquee when long；文案用 assistant_prompt_label */}
                                     <SingleLineMarqueeTitle
                                         as="h2"
-                                        className="text-2xl font-bold text-white text-center mb-3 leading-tight px-4 w-full"
+                                        className="text-2xl font-bold text-[#010101] text-center mb-3 leading-tight px-4 w-full"
                                     >
                                         {magnetContext?.assistant_prompt_label || 'Daily Briefing'}
                                     </SingleLineMarqueeTitle>
 
-                                    {/* Date（置于标题下方） */}
-                                    <p className="text-base text-white/80 text-center mb-8">{dateString}</p>
+                                    {/* Date */}
+                                    <p className="text-base text-[#010101]/80 text-center mb-8">
+                                        {dateString}
+                                    </p>
                                 </div>
 
                                 {/* Audio Player */}
@@ -558,69 +677,53 @@ export function MorningBriefing({
                                             <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
                                                 <defs>
                                                     <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
-                                                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0.2" />
+                                                        <stop offset="0%" stopColor="#010101" stopOpacity="0.6" />
+                                                        <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
                                                     </linearGradient>
                                                 </defs>
-                                                {/* Upper Wave */}
+                                                {/* 播放态：整段波形包在一个 g 里同步动，避免上下两 path 反向 y 在中间撕开间隙；仍不对 d 做插值 */}
                                                 {isPlaying ? (
-                                                    <motion.path
-                                                        d="M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
-                                                        animate={{
-                                                            d: [
-                                                                "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25",
-                                                                "M0 25 C 20 25, 30 5, 50 25 S 80 0, 100 25",
-                                                                "M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                            ]
-                                                        }}
+                                                    <motion.g
+                                                        animate={{ scaleY: [1, 1.07, 1] }}
+                                                        style={{ transformOrigin: '50px 25px' }}
                                                         transition={{
                                                             duration: 1.5,
                                                             repeat: Infinity,
-                                                            ease: "easeInOut"
+                                                            ease: 'easeInOut',
                                                         }}
-                                                    />
+                                                    >
+                                                        <path
+                                                            d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                                        />
+                                                        <path
+                                                            d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                                        />
+                                                    </motion.g>
                                                 ) : (
-                                                    <path
-                                                        d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
-                                                    />
-                                                )}
-                                                {/* Lower Wave (Mirrored) */}
-                                                {isPlaying ? (
-                                                    <motion.path
-                                                        d="M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
-                                                        animate={{
-                                                            d: [
-                                                                "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25",
-                                                                "M0 25 C 20 25, 30 45, 50 25 S 80 50, 100 25",
-                                                                "M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                            ]
-                                                        }}
-                                                        transition={{
-                                                            duration: 1.5,
-                                                            repeat: Infinity,
-                                                            ease: "easeInOut"
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <path
-                                                        d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
-                                                    />
+                                                    <>
+                                                        <path
+                                                            d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                                        />
+                                                        <path
+                                                            d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                                        />
+                                                    </>
                                                 )}
                                             </svg>
                                         </div>
@@ -629,12 +732,12 @@ export function MorningBriefing({
                                         <button
                                             onClick={handlePlay}
                                             disabled={!audioElement}
-                                            className="w-16 h-16 bg-white/15 rounded-full flex items-center justify-center hover:bg-white/25 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                                            className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
                                         >
                                             {isPlaying ? (
-                                                <Pause className="w-7 h-7 text-white" fill="currentColor" />
+                                                <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
                                             ) : (
-                                                <Play className="w-7 h-7 text-white ml-0.5" fill="currentColor" />
+                                                <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
                                             )}
                                         </button>
 
@@ -643,75 +746,59 @@ export function MorningBriefing({
                                             <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
                                                 {/* Upper Wave */}
                                                 {isPlaying ? (
-                                                    <motion.path
-                                                        d="M0 25 C 20 5, 50 25, 70 10 S 100 25, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
-                                                        animate={{
-                                                            d: [
-                                                                "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25",
-                                                                "M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25",
-                                                                "M0 25 C 20 0, 50 25, 70 5 S 100 25, 100 25"
-                                                            ]
-                                                        }}
+                                                    <motion.g
+                                                        animate={{ scaleY: [1, 1.07, 1] }}
+                                                        style={{ transformOrigin: '50px 25px' }}
                                                         transition={{
                                                             duration: 1.2,
                                                             repeat: Infinity,
-                                                            ease: "easeInOut"
+                                                            ease: 'easeInOut',
                                                         }}
-                                                    />
+                                                    >
+                                                        <path
+                                                            d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                                        />
+                                                        <path
+                                                            d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                                        />
+                                                    </motion.g>
                                                 ) : (
-                                                    <path
-                                                        d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.9 }}
-                                                    />
-                                                )}
-                                                {/* Lower Wave (Mirrored) */}
-                                                {isPlaying ? (
-                                                    <motion.path
-                                                        d="M0 25 C 20 45, 50 25, 70 40 S 100 25, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
-                                                        animate={{
-                                                            d: [
-                                                                "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25",
-                                                                "M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25",
-                                                                "M0 25 C 20 50, 50 25, 70 45 S 100 25, 100 25"
-                                                            ]
-                                                        }}
-                                                        transition={{
-                                                            duration: 1.2,
-                                                            repeat: Infinity,
-                                                            ease: "easeInOut"
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <path
-                                                        d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
-                                                        fill="none"
-                                                        stroke="#ffffff"
-                                                        strokeWidth="0"
-                                                        style={{ fill: '#ffffff', opacity: 0.4 }}
-                                                    />
+                                                    <>
+                                                        <path
+                                                            d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.9 }}
+                                                        />
+                                                        <path
+                                                            d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
+                                                            fill="none"
+                                                            stroke="#010101"
+                                                            strokeWidth="0"
+                                                            style={{ fill: '#010101', opacity: 0.4 }}
+                                                        />
+                                                    </>
                                                 )}
                                             </svg>
                                         </div>
                                     </div>
                                 )}
                                 {/* End Audio Player */}
-                            </div>
+                            </Glass>
                         </motion.div>
                     )}
 
                     {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
-                    {backdropReady && hasZipPermission && !hideLocationSelector && !showOnboarding && (
+                    {backdropReady && !isLoading && hasZipPermission && !hideLocationSelector && !showOnboarding && (
                         playContent?.locationFormatted && !isEditingLocation ? (
                             <button
                                 onClick={() => setIsEditingLocation(true)}
@@ -733,7 +820,7 @@ export function MorningBriefing({
                     )}
 
                     {/* 底部 CTA 按钮区：第1 站内 Chat / 第2 第三方 chat_url / 第3 打电话 / 第4 发短信 / 第5 发邮件 / 第6 skip_url */}
-                    {backdropReady && !showOnboarding && (
+                    {backdropReady && !isLoading && !showOnboarding && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}

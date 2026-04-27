@@ -112,7 +112,7 @@ export function MobileContainer({ children, className, backdropImage = null, onB
           style={{
             backgroundImage: effectiveUrl ? `url(${effectiveUrl})` : 'none',
             backgroundSize: 'cover',
-            backgroundPosition: 'left center',
+            backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
           }}
         />
