@@ -59,6 +59,74 @@ function configurePlaybackAudio(audio) {
     audio.preload = 'auto';
 }
 
+function isSameOriginMediaUrl(mediaUrl) {
+    if (!mediaUrl) return true;
+    try {
+        const u = new URL(mediaUrl, window.location.href);
+        return u.origin === window.location.origin;
+    } catch {
+        // 兜底：解析失败时不强制 CORS，避免把可播放的资源“升级”为会失败的 CORS 模式
+        return false;
+    }
+}
+
+function createPlaybackAudio(audioUrl, { startAtSeconds } = {}) {
+    const audio = new Audio();
+    /**
+     * 关键点：
+     * - 设置 crossOrigin='anonymous' 会让浏览器以 CORS 模式加载媒体；
+     * - 如果 mp3 服务器没返回 Access-Control-Allow-Origin，就会“直接无法播放”，并报 CORS Error。
+     *
+     * 因此这里只在“同源媒体”时才开启 crossOrigin，保证 /p/:sn 页面跨域 mp3 也能正常播放；
+     * 需要频谱/硬件光晕分析时，跨域资源会在 useHardwareAmbientGlow 内自动降级为 fallback。
+     */
+    if (typeof window !== 'undefined' && isSameOriginMediaUrl(audioUrl)) {
+        audio.crossOrigin = 'anonymous';
+    }
+    audio.src = audioUrl;
+    configurePlaybackAudio(audio);
+    if (startAtSeconds) audio.currentTime = startAtSeconds;
+    return audio;
+}
+
+function prefersReducedMotion() {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function clamp01(x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    return x;
+}
+
+function SpectrumGlyph({ className = '' }) {
+    const reduced = prefersReducedMotion();
+    const bars = [
+        { h: [0.25, 0.9, 0.35, 0.8, 0.3], d: 0.95, delay: 0.0 },
+        { h: [0.15, 0.7, 0.25, 0.85, 0.2], d: 1.1, delay: 0.12 },
+        { h: [0.35, 1.0, 0.4, 0.95, 0.3], d: 0.9, delay: 0.06 },
+        { h: [0.2, 0.75, 0.25, 0.8, 0.18], d: 1.05, delay: 0.18 },
+        { h: [0.28, 0.88, 0.32, 0.78, 0.24], d: 0.98, delay: 0.09 },
+    ];
+
+    return (
+        <span aria-hidden className={`inline-flex items-end gap-[3px] h-5 ${className}`}>
+            {bars.map((b, idx) => (
+                <motion.span
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={idx}
+                    className="w-[3px] h-5 rounded-full bg-white/95"
+                    style={{ transformOrigin: 'bottom' }}
+                    animate={reduced ? undefined : { scaleY: b.h }}
+                    initial={reduced ? undefined : { scaleY: b.h[0] }}
+                    transition={reduced ? undefined : { duration: b.d, repeat: Infinity, ease: 'easeInOut', delay: b.delay }}
+                />
+            ))}
+        </span>
+    );
+}
+
 /**
  * 首段缓冲播完后若后续数据未到会「假播放」：监听 waiting/stalled，续缓冲后自动 play() 恢复。
  * getPlayIntent 为 true 时表示用户仍处于播放态（未主动暂停、未播完）。
@@ -172,6 +240,8 @@ export function MorningBriefing({
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [showContactOptions, setShowContactOptions] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
 
     // 日期显示：
     // - 若播放内容包含 created_at（例如 tp/:id 使用 content_play 表），则用该时间
@@ -227,11 +297,7 @@ export function MorningBriefing({
             if (audioUrl) {
                 setAudioElement(prev => {
                     if (prev) return prev;
-                    const audio = new Audio(audioUrl);
-                    configurePlaybackAudio(audio);
-                    if (cachedPlayContent.savedCurrentTime) {
-                        audio.currentTime = cachedPlayContent.savedCurrentTime;
-                    }
+                    const audio = createPlaybackAudio(audioUrl, { startAtSeconds: cachedPlayContent?.savedCurrentTime });
                     audio.addEventListener('ended', async () => {
                         if (onEnded) console.log('audio ended', { longtext: true });
                         playIntentRef.current = false;
@@ -297,9 +363,7 @@ export function MorningBriefing({
         if (cachedPlayContent.audio_url) {
             setAudioElement(prev => {
                 if (prev) return prev;
-                const audio = new Audio(cachedPlayContent.audio_url);
-                configurePlaybackAudio(audio);
-                if (cachedPlayContent.savedCurrentTime) audio.currentTime = cachedPlayContent.savedCurrentTime;
+                const audio = createPlaybackAudio(cachedPlayContent.audio_url, { startAtSeconds: cachedPlayContent.savedCurrentTime });
                 audio.addEventListener('ended', async () => {
                     playIntentRef.current = false;
                     setIsPlaying(false);
@@ -321,6 +385,58 @@ export function MorningBriefing({
             });
         }
     }, [cachedPlayContent, cId, onLongTextIndexChange]);
+
+    // 监听播放器的进度和时长
+    useEffect(() => {
+        if (!audioElement) return;
+
+        const onTimeUpdate = () => setCurrentTime(audioElement.currentTime);
+        const onDurationChange = () => {
+            if (!Number.isNaN(audioElement.duration)) {
+                setDuration(audioElement.duration);
+            }
+        };
+
+        setCurrentTime(audioElement.currentTime);
+        if (audioElement.readyState > 0 && !Number.isNaN(audioElement.duration)) {
+            setDuration(audioElement.duration);
+        }
+
+        audioElement.addEventListener('timeupdate', onTimeUpdate);
+        audioElement.addEventListener('durationchange', onDurationChange);
+        audioElement.addEventListener('loadedmetadata', onDurationChange);
+
+        return () => {
+            audioElement.removeEventListener('timeupdate', onTimeUpdate);
+            audioElement.removeEventListener('durationchange', onDurationChange);
+            audioElement.removeEventListener('loadedmetadata', onDurationChange);
+        };
+    }, [audioElement]);
+
+    const formatTime = (timeInSeconds) => {
+        if (Number.isNaN(timeInSeconds)) return "0:00";
+        const totalSeconds = Math.floor(timeInSeconds);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const handleSeek = (e) => {
+        if (!audioElement) return;
+        const newTime = Number(e.target.value);
+        audioElement.currentTime = newTime;
+        setCurrentTime(newTime);
+    };
+
+    const skipBackward = () => {
+        if (!audioElement) return;
+        audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+    };
+
+    const skipForward = () => {
+        if (!audioElement) return;
+        audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 15);
+    };
 
     // 组件卸载时的清理
     useEffect(() => {
@@ -423,8 +539,7 @@ export function MorningBriefing({
                 }
 
                 if (content.audio_url) {
-                    const audio = new Audio(content.audio_url);
-                    configurePlaybackAudio(audio);
+                    const audio = createPlaybackAudio(content.audio_url);
                     audio.addEventListener('ended', () => {
                         if (isOrderSlotList) console.log('audio ended', { orderSlotList: true });
                         playIntentRef.current = false;
@@ -587,6 +702,14 @@ export function MorningBriefing({
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+            {/* Scrim / Gradient Overlay */}
+            <motion.div
+                initial={{ opacity: 0, y: '50%' }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="absolute bottom-0 left-0 right-0 h-[65%] bg-gradient-to-t from-black/95 via-black/40 to-transparent pointer-events-none z-0"
+            />
+
             <AnimatePresence>
                 {showOnboarding && (
                     <ZipCodeOnboarding
@@ -595,19 +718,10 @@ export function MorningBriefing({
                     />
                 )}
             </AnimatePresence>
-            {/* Header */}
-            {/* <header className="px-5 py-4 flex items-center justify-between relative z-10 flex-shrink-0">
-                {!isMinimalChromeSn(sn) && (
-                  <AssistantIdentity
-                      label={magnetContext?.assistant_prompt_label || 'DailyPlay'}
-                      imageClassName="shadow-sm"
-                  />
-                )}
-            </header> */}
 
             {/* Main Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-                <div className="flex flex-col items-center justify-center px-6 pb-24 min-h-full">
+            <div className="flex-1 overflow-y-auto no-scrollbar relative z-10">
+                <div className="flex flex-col items-center px-6 pt-12 pb-12 min-h-full">
                     {/* 背景未就绪或播放内容加载中：与 main.jsx 路由首屏相同的 navy 转圈，视觉与第一段加载一致 */}
                     {!error && (!backdropReady || isLoading) && (
                         <motion.div
@@ -639,194 +753,108 @@ export function MorningBriefing({
                         </motion.div>
                     )}
 
-                    {/* Content Card */}
-                    {backdropReady && playContent && !isLoading && !error && (
-                        <motion.div
-                            initial={{ y: 20 }}
-                            animate={{ y: 0 }}
-                            transition={{ duration: 0.5 }}
-                            className="w-full max-w-md mb-3"
-                        >
-                            <Glass
-                                variant="panel"
-                                className="p-8 flex flex-col justify-between"
-                                tintOpacity={0.2}
-                                borderOpacity={0.12}
-                                highlightEnabled={false}
+                    <div className="w-full max-w-md mt-auto flex flex-col gap-6">
+                        {/* Content Card */}
+                        {backdropReady && playContent && !isLoading && !error && (
+                            <motion.div
+                                initial={{ y: 20 }}
+                                animate={{ y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="w-full"
                             >
-                                <div className="flex flex-col items-center">
-                                    {/* Title - single line, marquee when long；文案用 assistant_prompt_label */}
-                                    <SingleLineMarqueeTitle
-                                        as="h2"
-                                        className="text-2xl font-bold text-[#010101] text-center mb-3 leading-tight px-4 w-full"
-                                    >
-                                        {magnetContext?.assistant_prompt_label || 'Daily Briefing'}
-                                    </SingleLineMarqueeTitle>
-
-                                    {/* Date */}
-                                    <p className="text-base text-[#010101]/80 text-center mb-8">
-                                        {dateString}
-                                    </p>
-                                </div>
-
-                                {/* Audio Player */}
-                                {!showOnboarding && (
-                                    <div className="flex items-center justify-center gap-6 mt-auto">
-                                        {/* Left Waveform */}
-                                        <div className="h-12 w-24 flex items-center justify-end">
-                                            <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
-                                                <defs>
-                                                    <linearGradient id="fade-gradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="#010101" stopOpacity="0.6" />
-                                                        <stop offset="100%" stopColor="#010101" stopOpacity="0.2" />
-                                                    </linearGradient>
-                                                </defs>
-                                                {/* 播放态：整段波形包在一个 g 里同步动，避免上下两 path 反向 y 在中间撕开间隙；仍不对 d 做插值 */}
-                                                {isPlaying ? (
-                                                    <motion.g
-                                                        animate={{ scaleY: [1, 1.07, 1] }}
-                                                        style={{ transformOrigin: '50px 25px' }}
-                                                        transition={{
-                                                            duration: 1.5,
-                                                            repeat: Infinity,
-                                                            ease: 'easeInOut',
-                                                        }}
-                                                    >
-                                                        <path
-                                                            d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                                        />
-                                                        <path
-                                                            d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                                        />
-                                                    </motion.g>
-                                                ) : (
-                                                    <>
-                                                        <path
-                                                            d="M0 25 C 20 25, 30 15, 50 25 S 80 10, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                                        />
-                                                        <path
-                                                            d="M0 25 C 20 25, 30 35, 50 25 S 80 40, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                                        />
-                                                    </>
-                                                )}
-                                            </svg>
-                                        </div>
-
-                                        {/* Play/Pause Button */}
-                                        <button
-                                            onClick={handlePlay}
-                                            disabled={!audioElement}
-                                            className="w-16 h-16 bg-white/10 backdrop-blur-[20px] border border-white/20 rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:bg-white/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                                        >
-                                            {isPlaying ? (
-                                                <Pause className="w-7 h-7 text-[#010101]" fill="#010101" />
-                                            ) : (
-                                                <Play className="w-7 h-7 text-[#010101] ml-0.5" fill="#010101" />
-                                            )}
-                                        </button>
-
-                                        {/* Right Waveform */}
-                                        <div className="h-12 w-24 flex items-center justify-start">
-                                            <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible">
-                                                {/* Upper Wave */}
-                                                {isPlaying ? (
-                                                    <motion.g
-                                                        animate={{ scaleY: [1, 1.07, 1] }}
-                                                        style={{ transformOrigin: '50px 25px' }}
-                                                        transition={{
-                                                            duration: 1.2,
-                                                            repeat: Infinity,
-                                                            ease: 'easeInOut',
-                                                        }}
-                                                    >
-                                                        <path
-                                                            d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                                        />
-                                                        <path
-                                                            d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                                        />
-                                                    </motion.g>
-                                                ) : (
-                                                    <>
-                                                        <path
-                                                            d="M0 25 C 20 10, 50 25, 70 15 S 100 25, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.9 }}
-                                                        />
-                                                        <path
-                                                            d="M0 25 C 20 40, 50 25, 70 35 S 100 25, 100 25"
-                                                            fill="none"
-                                                            stroke="#010101"
-                                                            strokeWidth="0"
-                                                            style={{ fill: '#010101', opacity: 0.4 }}
-                                                        />
-                                                    </>
-                                                )}
-                                            </svg>
-                                        </div>
+                                <div className="px-6 flex flex-col w-full">
+                                    <div className="flex flex-col items-start mb-6">
+                                        <p className="text-base text-white/80 w-full text-center">
+                                            {dateString}
+                                        </p>
                                     </div>
-                                )}
-                                {/* End Audio Player */}
-                            </Glass>
-                        </motion.div>
-                    )}
 
-                    {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
-                    {backdropReady && !isLoading && hasZipPermission && !hideLocationSelector && !showOnboarding && (
-                        playContent?.locationFormatted && !isEditingLocation ? (
-                            <button
-                                onClick={() => setIsEditingLocation(true)}
-                                className="w-full max-w-md px-4 py-2 text-center text-sm font-medium text-gray-500 hover:text-[#010101] transition-colors"
+                                    {/* Audio Player */}
+                                    {!showOnboarding && (
+                                        <div className="flex flex-col w-full">
+                                            {/* Progress Bar */}
+                                            <div className="flex flex-col w-full mb-6">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max={duration || 100}
+                                                    value={currentTime || 0}
+                                                    onChange={handleSeek}
+                                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-0 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full"
+                                                />
+                                                <div className="flex justify-between items-center mt-2 text-xs font-medium text-white/90 font-mono tracking-wider">
+                                                    <span>{formatTime(currentTime)}</span>
+                                                    <span>{formatTime(duration)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Controls */}
+                                            <div className="flex items-center justify-center gap-8">
+                                                <button
+                                                    type="button"
+                                                    onClick={skipBackward}
+                                                    className="text-white hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-full p-2"
+                                                    aria-label="Back 15 seconds"
+                                                >
+                                                    <SpectrumGlyph />
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={handlePlay}
+                                                    disabled={!audioElement}
+                                                    className="relative w-16 h-16 border-2 border-white rounded-full flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                                                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                                                >
+                                                    {isPlaying ? (
+                                                        <Pause className="w-6 h-6 text-white relative z-10" fill="currentColor" />
+                                                    ) : (
+                                                        <Play className="w-6 h-6 text-white ml-1 relative z-10" fill="currentColor" />
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={skipForward}
+                                                    className="text-white hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-full p-2"
+                                                    aria-label="Forward 15 seconds"
+                                                >
+                                                    <SpectrumGlyph />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                        {/* Location Selector / zipcode 选择：仅在有 zip 权限时展示，无权限不显示 */}
+                        {backdropReady && !isLoading && hasZipPermission && !hideLocationSelector && !showOnboarding && (
+                            playContent?.locationFormatted && !isEditingLocation ? (
+                                <button
+                                    onClick={() => setIsEditingLocation(true)}
+                                    className="w-full max-w-md px-4 py-2 text-center text-sm font-medium text-gray-500 hover:text-[#010101] transition-colors"
+                                >
+                                    {playContent.locationFormatted}
+                                </button>
+                            ) : (
+                                <LocationSelector
+                                    selectedLocation={selectedLocation}
+                                    onSelect={(loc) => {
+                                        onLocationSelect(loc);
+                                        if (loc) {
+                                            setIsEditingLocation(false);
+                                        }
+                                    }}
+                                />
+                            )
+                        )}
+                        {/* 底部 CTA 按钮区：第1 站内 Chat / 第2 第三方 chat_url / 第3 打电话 / 第4 发短信 / 第5 发邮件 / 第6 skip_url */}
+                        {backdropReady && !isLoading && !showOnboarding && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: 0.2 }}
+                                className="w-full space-y-3"
                             >
-                                {playContent.locationFormatted}
-                            </button>
-                        ) : (
-                            <LocationSelector
-                                selectedLocation={selectedLocation}
-                                onSelect={(loc) => {
-                                    onLocationSelect(loc);
-                                    if (loc) {
-                                        setIsEditingLocation(false);
-                                    }
-                                }}
-                            />
-                        )
-                    )}
-
-                    {/* 底部 CTA 按钮区：第1 站内 Chat / 第2 第三方 chat_url / 第3 打电话 / 第4 发短信 / 第5 发邮件 / 第6 skip_url */}
-                    {backdropReady && !isLoading && !showOnboarding && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.2 }}
-                            className="w-full max-w-md mt-24 space-y-3"
-                        >
                             {hasFullCta ? (
                                 <>
                                     {/* 按钮优先级：Assistant > Contact > Skip URL */}
@@ -836,54 +864,46 @@ export function MorningBriefing({
                                             {/* Assistant 类型按钮优先显示 */}
                                             {/* 第1个：跳转站内 Chat 页面，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_FC_CUSTOM_MADE、METHOD_METHOD_ASSISTANT_FC_CUSTOM_MADE 时显示 */}
                                             {showChatWithLeo && (
-                                                <Glass variant="card" className="px-6 py-4">
-                                                    <button
+                                                <button
                                                         type="button"
                                                         onClick={onTalkToAssistant}
-                                                        className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                        className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <span className="text-base font-medium text-[#010101]">{DEFAULT_ASSISTANT_CTA_LABEL}</span>
-                                                    </button>
-                                                </Glass>
+        <span className="text-base font-bold text-[#010101]">{DEFAULT_ASSISTANT_CTA_LABEL}</span>
+    </button>
                                             )}
                                             {/* 第2个：Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!showChatWithLeo && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
-                                                <Glass variant="card" className="px-6 py-4">
-                                                    <button
+                                                <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                        className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
-                                                    </button>
-                                                </Glass>
+        <span className="text-base font-bold text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
+    </button>
                                             )}
                                             {/* 第3个：跳转第三方 URL（chat_url），仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CHAT_URL、METHOD_METHOD_ASSISTANT_CHAT_URL 时显示 */}
                                             {showChatUrlButton && cta.chat_url && (
-                                                <Glass variant="card" className="px-6 py-4">
-                                                    <a
+                                                <a
                                                         href={cta.chat_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                        className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <span className="text-base font-medium text-[#010101]">{cta.name || 'Chat'}</span>
-                                                    </a>
-                                                </Glass>
+        <span className="text-base font-bold text-[#010101]">{cta.name || 'Chat'}</span>
+    </a>
                                             )}
                                         </>
                                     ) : showCtaContactButton && (cta.phone || cta.email) ? (
                                         // 如果没有 Assistant 权限但有 Contact 权限，则显示 Contact 按钮 - 中等优先级
                                         <>
-                                            <Glass variant="card" className="px-6 py-4">
-                                                <button
+                                            <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                    className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
-                                                    <span className="text-base font-medium text-[#010101]">{cta.name || 'Contact'}</span>
-                                                </button>
-                                            </Glass>
+        <span className="text-base font-bold text-[#010101]">{cta.name || 'Contact'}</span>
+    </button>
                                             {/* 联系选项弹窗 */}
                                             {showContactOptions && (
                                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -930,16 +950,14 @@ export function MorningBriefing({
                                         </>
                                     ) : showSkipUrlButton && cta.skip_url ? (
                                         // 如果没有 Assistant 和 Contact 权限，但有 Skip 权限，则显示 Skip 按钮 - 最低优先级
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
+                                        <a
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <span className="text-base font-medium text-[#010101]">{cta.name || 'Link'}</span>
-                                            </a>
-                                        </Glass>
+        <span className="text-base font-bold text-[#010101]">{cta.name || 'Link'}</span>
+    </a>
                                     ) : null}
                                 </>
                             ) : (
@@ -970,29 +988,25 @@ export function MorningBriefing({
                                             </Glass>
                                             {/* Assistant 按钮，仅当具备 MOD_MOD_ASSISTANT、FUNC_FUNC_ASSISTANT_CUSTOM_PROMT、METHOD_METHOD_ASSISTANT_CUSTOM_PROMT 时显示，但当默认 CTA 按钮已显示时不显示 */}
                                             {!ctaLink && !ctaTextOverride && hasAllPermissions(permissionSet, ASSISTANT_PROMPT_PERMISSIONS) && (
-                                                <Glass variant="card" className="px-6 py-4">
-                                                    <button
+                                                <button
                                                         type="button"
                                                         onClick={onOpenAssistantPromptChat}
-                                                        className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                        className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                     >
-                                                        <span className="text-base font-medium text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
-                                                    </button>
-                                                </Glass>
+        <span className="text-base font-bold text-[#010101]">{magnetContext?.assistant_prompt_label || 'Chat With Me'}</span>
+    </button>
                                             )}
                                         </>
                                     ) : showCtaContactButton && (cta?.phone || cta?.email) ? (
                                         // 中等优先级：Contact
                                         <>
-                                            <Glass variant="card" className="px-6 py-4">
-                                                <button
+                                            <button
                                                     type="button"
                                                     onClick={handleContactButtonClick}
-                                                    className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                    className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                                 >
-                                                    <span className="text-base font-medium text-[#010101]">{cta?.name || 'Contact'}</span>
-                                                </button>
-                                            </Glass>
+        <span className="text-base font-bold text-[#010101]">{cta?.name || 'Contact'}</span>
+    </button>
                                             {/* 联系选项弹窗 */}
                                             {showContactOptions && (
                                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1039,44 +1053,39 @@ export function MorningBriefing({
                                         </>
                                     ) : showSkipUrlButton && cta?.skip_url ? (
                                         // 最低优先级：Skip
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
+                                        <a
                                                 href={cta.skip_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <span className="text-base font-medium text-[#010101]">{cta?.name || 'Link'}</span>
-                                            </a>
-                                        </Glass>
+        <span className="text-base font-bold text-[#010101]">{cta?.name || 'Link'}</span>
+    </a>
                                     ) : ctaLink ? (
                                         // 如果以上权限都没有，但有链接，则显示链接
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <a
+                                        <a
                                                 href={ctaLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
-                                            </a>
-                                        </Glass>
+        <span className="text-base font-bold text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
+    </a>
                                     ) : (
                                         // 最后备选：Talk to Assistant
-                                        <Glass variant="card" className="px-6 py-4">
-                                            <button
+                                        <button
                                                 type="button"
                                                 onClick={onTalkToAssistant}
-                                                className="w-full flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
+                                                className="w-full h-14 bg-white rounded-2xl flex items-center justify-center hover:opacity-90 transition-all duration-150 active:scale-[0.97]"
                                             >
-                                                <span className="text-base font-medium text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
-                                            </button>
-                                        </Glass>
+        <span className="text-base font-bold text-[#010101]">{ctaTextOverride || DEFAULT_ASSISTANT_CTA_LABEL}</span>
+    </button>
                                     )}
                                 </>
                             )}
                         </motion.div>
                     )}
+                    </div>
                 </div>
             </div>
         </div>
