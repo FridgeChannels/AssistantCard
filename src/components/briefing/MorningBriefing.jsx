@@ -94,6 +94,14 @@ function prefersReducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+function isIOSLikeBrowser() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    return /iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+}
+
 function clamp01(x) {
     if (x <= 0) return 0;
     if (x >= 1) return 1;
@@ -614,10 +622,15 @@ export function MorningBriefing({
                 });
             }
         } else {
-            // 先等到可播再 play，避免首击「只响一截」；再 await play()；pause 打断会抛 AbortError
+            // iOS/Safari 要求 play() 发生在用户手势回调内；否则会被策略拦截。
+            // 其他平台保留“先等可播再播放”的策略，减少首击后欠载导致的短暂静音。
             try {
-                await waitUntilAudioPlayable(audioElement);
-                await audioElement.play();
+                if (isIOSLikeBrowser()) {
+                    await audioElement.play();
+                } else {
+                    await waitUntilAudioPlayable(audioElement);
+                    await audioElement.play();
+                }
             } catch (err) {
                 if (err?.name === 'AbortError') {
                     playIntentRef.current = false;
